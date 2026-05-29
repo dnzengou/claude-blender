@@ -1,0 +1,82 @@
+https://share.google/aimode/c10pds5z6unWIP3rh
+
+
+The best way to use Claude and Blender together is by pairing the Claude Desktop app with the official Blender MCP (Model Context Protocol) Add-on. This live connection gives Claude direct read/write access to your Blender scene via its Python API, allowing you to control and build 3D environments using natural language. [1, 2, 3, 4] 
+## For What? (Optimal Use Cases)
+Instead of complex organic modeling, the Claude + Blender setup excels at the following tasks: [5] 
+
+* Automating Repetitive Tasks: Ask Claude to batch-rename data-blocks, clean up unused meshes, or assign materials across thousands of objects.
+* Scene Layout & Assembly: Prompt Claude to duplicate assets (like trees or rocks) and randomly distribute them, create procedural city layouts, or build rooms.
+* Debugging & Node Explanations: If you have an incredibly complex Geometry Node setup from the community, you can ask Claude to map out and explain exactly what each node does and add frame labels directly into your node editor.
+* Custom Add-on Generation: You don't need to know Python. Describe a custom tool you want (e.g., "an operator that randomizes rotation and scale for selected assets"), and Claude will write, test, and inject the operator straight into your Blender interface.
+* Lighting and Material Setup: Direct Claude to create and apply photorealistic shaders (e.g., "apply a shiny, textured gold material") or adjust camera and lighting compositions. [1, 5, 6, 7, 8] 
+
+## How to Set It Up
+
+   1. Install the Connector: In the Claude Desktop app, go to Customize > Connectors and install the Blender connector.
+   2. Install the Add-on: Open the [Blender MCP GitHub](https://github.com/ahujasid/blender-mcp) repository in your web browser alongside Blender. Drag the install link directly into the Blender viewport, or download and install it from disk via Edit > Preferences > Add-ons.
+   3. Start the Server: In Blender, press N to open the side panel and navigate to the BlenderMCP tab. Click Connect to Claude.
+   4. Prompt Away: Type your text commands into Claude, permit the execution in the pop-up permissions box, and watch Claude execute Python code to change your 3D scene. [1, 4, 9, 10, 11] 
+
+[How to Connect Claude to Blender 3D in 1 Minute (New Update)](https://www.youtube.com/watch?v=7VYkkBBAoKY&t=24), YouTube · PrimeSkill Explorer · 2026 M05 4
+If you are just getting started, I can help you write your first custom prompt, or provide information on troubleshooting MCP connection errors. Which would you prefer?
+
+[1] [https://claude.com](https://claude.com/resources/tutorials/using-the-blender-connector-in-claude)
+[2] [https://www.youtube.com](https://www.youtube.com/watch?v=0kMhtqYBe4Y)
+[3] [https://www.instagram.com](https://www.instagram.com/p/DXt5jbliqRe/?img_index=10)
+[4] [https://www.harknessai.nz](https://www.harknessai.nz/articles/generate-3d-models-claude-blender)
+[5] [https://www.mindstudio.ai](https://www.mindstudio.ai/blog/claude-blender-mcp-real-world-performance)
+[6] [https://www.eigent.ai](https://www.eigent.ai/blog/claude-blender-mcp)
+[7] [https://app.therundown.ai](https://app.therundown.ai/guides/how-to-3d-model-anything-with-claude-blender)
+[8] [https://skywork.ai](https://skywork.ai/skypage/en/blender-ai-3d-modeling/1978323468705722368)
+[9] [https://github.com](https://github.com/ahujasid/blender-mcp)
+[10] [https://www.youtube.com](https://www.youtube.com/watch?v=YW5WAk7mS0g&vl=en)
+[11] [https://www.buildfastwithai.com](https://www.buildfastwithai.com/blogs/claude-connectors-creative-tools-2026)
+
+
+https://github.com/ahujasid/blender-mcp
+
+When you pair Claude's coding intelligence with Blender's 3D engine, you aren't just sculpting basic cubes—you are building dynamic, mathematical, and generative worlds. Because Claude handles the complex underlying Python API, you can treat it as a technical director to create complex systems.
+Here are the most creative, high-utility projects you can build right now, along with examples and resources to check out.
+------------------------------
+## 1. Generative Sci-Fi Worlds & Cyberpunk Cityscapes
+Instead of placing every building manually, you can use Claude to script entire procedural urban layouts based on math and logic.
+
+* What to build: Tell Claude to "Generate a grid of 50 futuristic skyscrapers with randomized heights, add glowing neon emissive materials to random windows, and scatter small flying vehicles along a spline curve between them."
+* How it works: Claude uses loops to generate geometry, randomizes local scaling, and builds multi-slot PBR shaders from scratch on the fly.
+* Real Example: In his YouTube video, [I Gave Claude Code Blender Skills](https://www.youtube.com/watch?v=mFNokTtsTAk), creator Dave shows how Claude can spin up a fully realized Tokyo Cyberpunk city, a Japanese garden, and floating islands using just structured prompts.
+
+## 2. Interactive Scientific Data Visualizations
+Blender is heavily used for educational graphics, but rigging atoms and data streams by hand is tedious. Claude makes this instant.
+
+* What to build: "Build an accurate, animated 3D solar system with relative planet scales, or generate a scientifically accurate 3D double-helix DNA strand with textured base pairs."
+* How it works: Claude looks up the exact trigonometric or mathematical coordinates for structures like a Benzene ring or atomic models and instantly scripts them into perfect 3D shapes.
+* Real Example: The tutorial [LIVE Claude AI + Blender MCP LIVE](https://www.youtube.com/watch?v=lzbbPBLPtdY) demonstrates how to generate real-world 3D scientific diagrams from scratch using Claude Desktop.
+
+## 3. Smart Asset Optimizers & Performance Animators
+You can use Claude as a background "Scene Janitor" to clean up and analyze massive production files.
+
+* What to build: "Analyze my scene. Find every object that has a polygon count over 20,000 but takes up less than 5% of the active camera's viewport, and add a Decimate modifier to reduce memory."
+* How it works: Claude reads the camera vector data, calculates relative bounding box sizes, and applies modifiers automatically.
+* Official Source: The official [Blender Lab MCP Server Guide](https://www.blender.org/lab/mcp-server/) showcases how artists can use Claude to run graph analyses on heavily bogged-down demo scenes (like the Classroom benchmark file) to spot and fix hidden performance bottlenecks.
+
+## 4. Custom AI UI Panels (Vibe-Coding Tools)
+If you find yourself constantly navigating deep submenus to perform the same actions, let Claude build you a custom button.
+
+* What to build: "Create a custom sidebar panel in the 3D viewport named 'Quick Physics'. Add three buttons: 'Make Ground', 'Make Active Rigid Body', and 'Clear Simulation Layout'."
+* How it works: Claude scripts a native Blender UI class (bpy.types.Panel) and injects it live into your running interface, giving you a custom plugin without writing a single line of script yourself.
+* Real Example: Read through the deep dive on the [Eigent.ai Claude Blender Guide](https://www.eigent.ai/blog/claude-blender-mcp), which covers how Claude acts as an iterative developer tool to build custom panels and tools right into the user interface.
+
+------------------------------
+## Step-by-Step Inspiration To Try Right Now
+To see the workflow in action from a blank scene to a finished automated video render, watch the full 26-minute guide [Create 3D with Claude AI with Blender MCP](https://www.youtube.com/watch?v=lCyQ717DuzQ).
+Once your environment is connected, open a fresh project file and type this creative layout prompt into Claude to test its abilities:
+
+"Clear the default scene. Generate a low-poly forest floor with a winding cobblestone path. Randomly distribute 30 low-poly pine trees along the edges of the path. Add a warm sun lamp casting long shadows, and point the active camera directly at the center of the path."
+
+Would you like help writing a custom system prompt snippet that forces Claude to always use optimized geometry when building your ideas?
+
+
+https://www.eigent.ai/blog/claude-blender-mcp
+
+https://www.youtube.com/watch?v=lCyQ717DuzQ
