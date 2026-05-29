@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.2.0 · 2026-05-29 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.3.0 · 2026-05-29 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -12,23 +12,24 @@ ARM-native: pure Python, zero native extensions — runs on Apple Silicon, Raspb
 ## Architecture
 
 ```
-                  ┌─ --scene ──► Blender MCP socket :9876
-                  │                  get_scene_info()
-User prompt (CLI) │                       │
-        │         │              scene JSON injected into prompt
-        ▼         │                       │
-  blender_gen.py ◄┘                       ▼
-    ├── argparse  →  prompt, model, output, send, scene, stream
+Input modes
+  prompt (single)  ──┐
+  --batch FILE      ──┤
+                      ▼
+  blender_gen.py
+    ├── --scene ──► MCP get_scene_info()  →  inject JSON into prompt
+    ├── SYSTEM_BLOCK  (cache_control: ephemeral — cached after first call)
     ├── anthropic.Anthropic()
-    │    ├── messages.create()        ← default
-    │    └── messages.stream()        ← --stream (token-by-token stdout)
-    └── bpy script
-         ├── stdout / -o FILE         ← default
-         └── --send ──► Blender MCP socket :9876
-                            execute_code(script)
-                                   │
-                                   ▼
-                            Blender viewport
+    │    ├── messages.create()            ← single / batch
+    │    └── messages.stream()            ← --stream
+    └── bpy script(s)
+         ├── stdout / -o FILE             ← single
+         ├── {stem}_{001}.py …            ← --batch --output-dir
+         └── --send ──► MCP execute_code()  →  --host HOST --port PORT
+                                                  │
+                                                  ▼
+                                           Blender viewport
+                                        (local or remote LAN)
 ```
 
 ---
@@ -43,6 +44,7 @@ User prompt (CLI) │                       │
 | `CLAUDE.md` | project context for AI coding assistants |
 | `claude_blender_Blueprint.md` | this file |
 | `claude-blender-prompts.txt` | reference prompts & links |
+| `example_batch.txt` | sample batch prompts file (5 scenes) |
 | `README.md` | GitHub repo landing page |
 | `LICENSE` | MIT |
 | `.github/workflows/ci.yml` | GitHub Actions CI (lint + syntax, ARM + x86) |
@@ -65,11 +67,17 @@ User prompt (CLI) │                       │
 - [x] `--stream` flag: stream Claude output token-by-token to stdout
 - [x] Graceful fallback: warns if Blender MCP unreachable; exits 1 only on `--send` fail
 
-### v0.3 — Next 🔲
-- [ ] Prompt caching (`cache_control`) on SYSTEM_PROMPT — cut repeat-call cost ~80%
-- [ ] Batch mode: `--batch prompts.txt` → generate multiple scripts in one run
-- [ ] `--port` flag: configurable MCP socket port (default 9876)
-- [ ] `--host` flag: remote Blender support (non-localhost)
+### v0.3 — Shipped ✅
+- [x] Prompt caching: `cache_control: ephemeral` on SYSTEM_BLOCK — ~80% token cost on repeat hits
+- [x] Batch mode: `--batch prompts.txt --output-dir ./scripts/` → `{stem}_{001..n}.py`
+- [x] `--host` / `--port` flags: configurable MCP target (local or remote Blender)
+- [x] `example_batch.txt`: 5 sample prompts (torus, landscape, city, DNA, solar system)
+- [x] `read_batch_prompts()`: skips empty lines and `#` comments
+
+### v0.4 — Next 🔲
+- [ ] `--watch` mode: re-run on file save (inotify/fsevents-based hot-reload into Blender)
+- [ ] Token usage report: print cache hit/miss stats after each call (`--verbose`)
+- [ ] `--iterate N`: auto-refine — send script to Blender, capture error, re-prompt Claude N times
 
 ---
 
@@ -83,6 +91,12 @@ User prompt (CLI) │                       │
 ---
 
 ## Changelog
+
+### v0.3.0 — 2026-05-29
+- Prompt caching: SYSTEM_PROMPT wrapped in `cache_control: ephemeral` block; ~80% cost reduction on cache hits
+- Batch mode: `--batch FILE --output-dir DIR` generates numbered `.py` files, works with `--send`
+- `--host` / `--port`: configurable MCP socket target (replaces hardcoded localhost:9876)
+- Added `example_batch.txt` with 5 demo prompts
 
 ### v0.2.0 — 2026-05-29
 - `--send`: execute generated script in live Blender via MCP socket (localhost:9876)
@@ -100,4 +114,4 @@ User prompt (CLI) │                       │
 
 ---
 
-*claude-blender Blueprint v0.2.0 · 2026-05-29 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.3.0 · 2026-05-29 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
