@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.1.0 · 2026-05-29 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.1.1 · 2026-05-29 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -38,6 +38,9 @@ blender_gen.py
 | `CLAUDE.md` | project context for AI coding assistants |
 | `claude_blender_Blueprint.md` | this file |
 | `claude-blender-prompts.txt` | reference prompts & links |
+| `README.md` | GitHub repo landing page |
+| `LICENSE` | MIT |
+| `.github/workflows/ci.yml` | GitHub Actions CI (lint + syntax, ARM + x86) |
 
 ---
 
@@ -49,6 +52,7 @@ blender_gen.py
 - [x] `--model` flag: opus / sonnet / haiku
 - [x] System prompt engineered for complete, runnable bpy scripts
 - [x] ARM-compatible (pure Python)
+- [x] GitHub Actions CI: ruff lint + py_compile syntax check (Python 3.10, 3.12 matrix)
 
 ### v0.2 — Next 🔲
 - [ ] `--send` flag: push script directly to Blender via MCP socket (port 9876)
@@ -72,10 +76,14 @@ blender_gen.py
 
 ## Changelog
 
+### v0.1.1 — 2026-05-29
+- Added GitHub Actions CI: ruff lint + py_compile syntax validation (Python 3.10 & 3.12 matrix)
+- Merged upstream README.md + LICENSE (MIT) from GitHub initial commit
+
 ### v0.1.0 — 2026-05-29
 - Initial release: CLI, Claude API integration, ARM-optimized pure-Python implementation
 - Models supported: opus-4-7, sonnet-4-6, haiku-4-5
 
 ---
 
-*claude-blender Blueprint v0.1.0 · 2026-05-29*
+*claude-blender Blueprint v0.1.1 · 2026-05-29 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
