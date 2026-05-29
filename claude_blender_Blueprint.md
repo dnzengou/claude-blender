@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.1.1 · 2026-05-29 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.2.0 · 2026-05-29 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -12,18 +12,23 @@ ARM-native: pure Python, zero native extensions — runs on Apple Silicon, Raspb
 ## Architecture
 
 ```
-User prompt (CLI)
-      │
-      ▼
-blender_gen.py
-  ├── argparse  →  prompt, model, output path
-  ├── anthropic.Anthropic()
-  │       └── messages.create(system=SYSTEM_PROMPT, user=prompt)
-  └── stdout / .py file
-              │
-              ▼
-         Blender Text Editor
-         (Run Script → bpy executes)
+                  ┌─ --scene ──► Blender MCP socket :9876
+                  │                  get_scene_info()
+User prompt (CLI) │                       │
+        │         │              scene JSON injected into prompt
+        ▼         │                       │
+  blender_gen.py ◄┘                       ▼
+    ├── argparse  →  prompt, model, output, send, scene, stream
+    ├── anthropic.Anthropic()
+    │    ├── messages.create()        ← default
+    │    └── messages.stream()        ← --stream (token-by-token stdout)
+    └── bpy script
+         ├── stdout / -o FILE         ← default
+         └── --send ──► Blender MCP socket :9876
+                            execute_code(script)
+                                   │
+                                   ▼
+                            Blender viewport
 ```
 
 ---
@@ -54,15 +59,17 @@ blender_gen.py
 - [x] ARM-compatible (pure Python)
 - [x] GitHub Actions CI: ruff lint + py_compile syntax check (Python 3.10, 3.12 matrix)
 
-### v0.2 — Next 🔲
-- [ ] `--send` flag: push script directly to Blender via MCP socket (port 9876)
-- [ ] `--scene` flag: first GET current scene state, include in prompt context
-- [ ] Streaming output (stream=True) for long scripts
+### v0.2 — Shipped ✅
+- [x] `--send` flag: push script directly to Blender via MCP socket (localhost:9876)
+- [x] `--scene` flag: GET live scene state from Blender, inject into Claude prompt
+- [x] `--stream` flag: stream Claude output token-by-token to stdout
+- [x] Graceful fallback: warns if Blender MCP unreachable; exits 1 only on `--send` fail
 
-### v0.3 — Later 🔲
-- [ ] Batch mode: read prompts from file, output multiple scripts
-- [ ] Prompt caching (cache_control) for repeated SYSTEM_PROMPT calls
-- [ ] GitHub Actions CI: lint + dry-run syntax check via `py_compile`
+### v0.3 — Next 🔲
+- [ ] Prompt caching (`cache_control`) on SYSTEM_PROMPT — cut repeat-call cost ~80%
+- [ ] Batch mode: `--batch prompts.txt` → generate multiple scripts in one run
+- [ ] `--port` flag: configurable MCP socket port (default 9876)
+- [ ] `--host` flag: remote Blender support (non-localhost)
 
 ---
 
@@ -70,11 +77,18 @@ blender_gen.py
 
 | API | Auth | Usage |
 |-----|------|-------|
-| Anthropic Messages API | `ANTHROPIC_API_KEY` env var | Generate bpy scripts |
+| Anthropic Messages API | `ANTHROPIC_API_KEY` env var | Generate bpy scripts (batch + stream) |
+| Blender MCP socket | none (localhost only) | `execute_code`, `get_scene_info` via TCP :9876 |
 
 ---
 
 ## Changelog
+
+### v0.2.0 — 2026-05-29
+- `--send`: execute generated script in live Blender via MCP socket (localhost:9876)
+- `--scene`: inject live scene JSON into Claude prompt before generation
+- `--stream`: stream Claude response token-by-token to stdout
+- All flags composable; graceful error handling on socket failures
 
 ### v0.1.1 — 2026-05-29
 - Added GitHub Actions CI: ruff lint + py_compile syntax validation (Python 3.10 & 3.12 matrix)
@@ -86,4 +100,4 @@ blender_gen.py
 
 ---
 
-*claude-blender Blueprint v0.1.1 · 2026-05-29 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.2.0 · 2026-05-29 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
