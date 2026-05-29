@@ -1,0 +1,8 @@
+# Example batch prompts — run with:
+# python blender_gen.py --batch example_batch.txt --output-dir ./scripts/
+
+spinning gold torus with emission glow
+low-poly mountain landscape with snow caps and warm sun lamp
+procedural city block 6x6 grid, randomised building heights, neon emissive windows
+animated DNA double helix, 10 base pairs, slow rotation on Z axis
+solar system: sun + 4 planets with correct relative scale, elliptical orbits
