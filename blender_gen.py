@@ -9,14 +9,16 @@ Usage:
     python blender_gen.py "solar system" --stream --model claude-sonnet-4-6
     python blender_gen.py --batch prompts.txt --output-dir ./scripts/
     python blender_gen.py "scatter rocks" --send --host 192.168.1.10 --port 9876
+    python blender_gen.py "fix this mesh" --send --iterate 3 --verbose
+    python blender_gen.py --watch prompt.txt --send
 """
 
 import anthropic
 import argparse
 import json
-import os
 import socket
 import sys
+import time
 from pathlib import Path
 
 MCP_TIMEOUT = 10  # seconds
@@ -60,18 +62,40 @@ def get_scene_info(host: str, port: int) -> str:
     return json.dumps(info, indent=2) if isinstance(info, dict) else str(info)
 
 
-def send_to_blender(code: str, host: str, port: int) -> str:
-    """Execute a bpy script in running Blender via MCP socket."""
+def _send_raw(code: str, host: str, port: int) -> tuple:
+    """Execute script; returns (success: bool, result_or_error: str). Raises OSError on connect failure."""
     with socket.create_connection((host, port), timeout=MCP_TIMEOUT) as s:
         resp = _mcp_send(s, {"type": "execute_code", "code": code})
     if resp.get("status") == "error":
-        raise RuntimeError(f"Blender execution error: {resp.get('message')}")
-    return resp.get("result", "")
+        return False, resp.get("message", "unknown error")
+    return True, resp.get("result", "")
+
+
+def send_to_blender(code: str, host: str, port: int) -> str:
+    """Execute a bpy script in running Blender via MCP socket."""
+    ok, msg = _send_raw(code, host, port)
+    if not ok:
+        raise RuntimeError(f"Blender execution error: {msg}")
+    return msg
+
+
+# ── verbose / usage helper ────────────────────────────────────────────────────
+
+def _print_usage(usage) -> None:
+    """Print token usage stats including cache hit/miss to stderr."""
+    cached = getattr(usage, "cache_read_input_tokens", 0) or 0
+    created = getattr(usage, "cache_creation_input_tokens", 0) or 0
+    est_saved = int(cached * 0.9)
+    print(
+        f"Usage — in: {usage.input_tokens}  out: {usage.output_tokens}"
+        f"  cache_hit: {cached}  cache_write: {created}  est_saved: ~{est_saved} tokens",
+        file=sys.stderr,
+    )
 
 
 # ── Claude generation ─────────────────────────────────────────────────────────
 
-def generate_blender_script(prompt: str, model: str, stream: bool = False) -> str:
+def generate_blender_script(prompt: str, model: str, stream: bool = False, verbose: bool = False) -> str:
     """Call Claude with a cached system prompt. Returns complete bpy script."""
     client = anthropic.Anthropic()
 
@@ -89,9 +113,13 @@ def generate_blender_script(prompt: str, model: str, stream: bool = False) -> st
                 print(text, end="", flush=True)
                 parts.append(text)
         print()
+        if verbose:
+            _print_usage(s.get_final_message().usage)
         return "".join(parts)
 
     response = client.messages.create(**kwargs)
+    if verbose:
+        _print_usage(response.usage)
     return response.content[0].text
 
 
@@ -99,6 +127,48 @@ def read_batch_prompts(path: str) -> list[str]:
     """Read non-empty, non-comment lines from a batch prompts file."""
     lines = Path(path).read_text(encoding="utf-8").splitlines()
     return [ln.strip() for ln in lines if ln.strip() and not ln.startswith("#")]
+
+
+# ── iterate helper ────────────────────────────────────────────────────────────
+
+def _execute_with_iterate(script: str, args, label: str = "") -> str:
+    """Send script to Blender; on error ask Claude to fix, up to args.iterate times."""
+    max_iter = args.iterate or 0
+    current = script
+
+    for attempt in range(max_iter + 1):
+        tag = f" [{label}]" if label else ""
+        print(f"Sending to Blender ({args.host}:{args.port}){tag}...", file=sys.stderr)
+        try:
+            ok, msg = _send_raw(current, args.host, args.port)
+        except (ConnectionRefusedError, OSError):
+            print(
+                f"Error: Blender MCP not reachable on {args.host}:{args.port}.\n"
+                "Start Blender, enable BlenderMCP add-on, click 'Connect to Claude'.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        if ok:
+            if msg:
+                print(f"Blender: {msg}", file=sys.stderr)
+            print("Done.", file=sys.stderr)
+            return current
+
+        if attempt >= max_iter:
+            print(f"Blender error: {msg}", file=sys.stderr)
+            sys.exit(1)
+
+        print(f"  Error (attempt {attempt + 1}/{max_iter}): {msg}  — asking Claude to fix...", file=sys.stderr)
+        repair = (
+            f"Fix this bpy script that raised an error in Blender:\n\n"
+            f"```python\n{current}\n```\n\n"
+            f"Error: {msg}\n\n"
+            f"Return only the corrected Python code."
+        )
+        current = generate_blender_script(repair, args.model, verbose=args.verbose)
+
+    return current
 
 
 # ── single-prompt pipeline ────────────────────────────────────────────────────
@@ -112,7 +182,7 @@ def run_single(prompt: str, args) -> None:
         except (ConnectionRefusedError, OSError) as exc:
             print(f"Warning: cannot reach Blender MCP ({exc}). Ignoring --scene.", file=sys.stderr)
 
-    script = generate_blender_script(prompt, args.model, stream=args.stream)
+    script = generate_blender_script(prompt, args.model, stream=args.stream, verbose=args.verbose)
 
     if args.output:
         _write_file(args.output, script)
@@ -120,7 +190,12 @@ def run_single(prompt: str, args) -> None:
         print(script)
 
     if args.send:
-        _send(script, args.host, args.port)
+        if args.iterate:
+            script = _execute_with_iterate(script, args)
+            if args.output:
+                _write_file(args.output, script)  # overwrite with fixed version
+        else:
+            _send(script, args.host, args.port)
 
 
 # ── batch pipeline ────────────────────────────────────────────────────────────
@@ -134,12 +209,48 @@ def run_batch(prompts: list[str], args) -> None:
 
     for i, prompt in enumerate(prompts, start=1):
         print(f"[{i}/{total}] {prompt[:60]}", file=sys.stderr)
-        script = generate_blender_script(prompt, args.model)  # no stream in batch
+        script = generate_blender_script(prompt, args.model, verbose=args.verbose)
         out_path = out_dir / f"{stem}_{i:03d}.py"
         _write_file(str(out_path), script)
 
         if args.send:
-            _send(script, args.host, args.port)
+            if args.iterate:
+                script = _execute_with_iterate(script, args, label=f"{i}/{total}")
+                _write_file(str(out_path), script)  # overwrite with fixed version
+            else:
+                _send(script, args.host, args.port)
+
+
+# ── watch pipeline ────────────────────────────────────────────────────────────
+
+def run_watch(path: str, args) -> None:
+    """Poll a prompt text file; regenerate (and optionally send) on each save."""
+    p = Path(path)
+    if not p.exists():
+        print(f"Error: watch file not found: {path}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Watching {path}  (Ctrl+C to stop)", file=sys.stderr)
+    last_mtime = None
+
+    try:
+        while True:
+            try:
+                mtime = p.stat().st_mtime
+            except OSError:
+                time.sleep(0.5)
+                continue
+
+            if mtime != last_mtime:
+                last_mtime = mtime
+                prompt = p.read_text(encoding="utf-8").strip()
+                if prompt:
+                    print(f"\n--- {time.strftime('%H:%M:%S')} | {prompt[:60]} ---", file=sys.stderr)
+                    run_single(prompt, args)
+
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        print("\nWatch stopped.", file=sys.stderr)
 
 
 # ── shared helpers ────────────────────────────────────────────────────────────
@@ -151,12 +262,10 @@ def _write_file(path: str, content: str) -> None:
 
 
 def _send(script: str, host: str, port: int) -> None:
+    """Send script to Blender (no iterate). Exits 1 on failure."""
     print(f"Sending to Blender ({host}:{port})...", file=sys.stderr)
     try:
-        result = send_to_blender(script, host, port)
-        if result:
-            print(f"Blender: {result}", file=sys.stderr)
-        print("Done.", file=sys.stderr)
+        ok, msg = _send_raw(script, host, port)
     except (ConnectionRefusedError, OSError):
         print(
             f"Error: Blender MCP not reachable on {host}:{port}.\n"
@@ -164,6 +273,12 @@ def _send(script: str, host: str, port: int) -> None:
             file=sys.stderr,
         )
         sys.exit(1)
+    if not ok:
+        print(f"Error: Blender execution failed: {msg}", file=sys.stderr)
+        sys.exit(1)
+    if msg:
+        print(f"Blender: {msg}", file=sys.stderr)
+    print("Done.", file=sys.stderr)
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
@@ -177,6 +292,7 @@ def main():
     input_group = parser.add_mutually_exclusive_group(required=True)
     input_group.add_argument("prompt", nargs="?", help="What to build in Blender")
     input_group.add_argument("--batch", metavar="FILE", help="File of prompts (one per line)")
+    input_group.add_argument("--watch", metavar="FILE", help="Prompt text file to watch; regenerate on each save")
 
     parser.add_argument(
         "--model",
@@ -191,10 +307,20 @@ def main():
     parser.add_argument("--stream", action="store_true", help="Stream Claude output to stdout")
     parser.add_argument("--host", default="localhost", help="Blender MCP host (default: localhost)")
     parser.add_argument("--port", type=int, default=9876, help="Blender MCP port (default: 9876)")
+    parser.add_argument("--verbose", action="store_true", help="Print token usage (cache hit/miss) after each call")
+    parser.add_argument(
+        "--iterate", type=int, default=0, metavar="N",
+        help="Auto-fix: if Blender reports an error, re-prompt Claude up to N times (requires --send)",
+    )
 
     args = parser.parse_args()
 
-    if args.batch:
+    if args.iterate and not args.send:
+        parser.error("--iterate requires --send")
+
+    if args.watch:
+        run_watch(args.watch, args)
+    elif args.batch:
         prompts = read_batch_prompts(args.batch)
         if not prompts:
             print("Error: batch file is empty.", file=sys.stderr)

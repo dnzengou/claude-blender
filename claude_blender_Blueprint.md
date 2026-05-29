@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.3.0 · 2026-05-29 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.4.0 · 2026-05-29 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -45,6 +45,8 @@ Input modes
 | `claude_blender_Blueprint.md` | this file |
 | `claude-blender-prompts.txt` | reference prompts & links |
 | `example_batch.txt` | sample batch prompts file (5 scenes) |
+| `prompts/mcp_prompts.md` | Claude Desktop × BlenderMCP prompt library (6 examples) |
+| `scenes/cyberpunk_city.py` | reference bpy scene: cyberpunk city grid |
 | `README.md` | GitHub repo landing page |
 | `LICENSE` | MIT |
 | `.github/workflows/ci.yml` | GitHub Actions CI (lint + syntax, ARM + x86) |
@@ -74,10 +76,15 @@ Input modes
 - [x] `example_batch.txt`: 5 sample prompts (torus, landscape, city, DNA, solar system)
 - [x] `read_batch_prompts()`: skips empty lines and `#` comments
 
-### v0.4 — Next 🔲
-- [ ] `--watch` mode: re-run on file save (inotify/fsevents-based hot-reload into Blender)
-- [ ] Token usage report: print cache hit/miss stats after each call (`--verbose`)
-- [ ] `--iterate N`: auto-refine — send script to Blender, capture error, re-prompt Claude N times
+### v0.4 — Shipped ✅
+- [x] `--watch FILE`: poll a prompt text file; regenerate + optionally send on each save (hot-reload into Blender)
+- [x] `--verbose`: print token usage (input/output + cache hit/write + est. tokens saved) after each call
+- [x] `--iterate N`: auto-fix loop — send script to Blender, capture error, re-prompt Claude up to N times
+
+### v0.5 — Next 🔲
+- [ ] GUI tray / system-tray launcher (click-to-generate without terminal)
+- [ ] `--diff`: show a diff of scene objects before/after execution
+- [ ] Named presets: `--preset cyberpunk / nature / abstract` inject style tokens into system prompt
 
 ---
 
@@ -91,6 +98,13 @@ Input modes
 ---
 
 ## Changelog
+
+### v0.4.0 — 2026-05-29
+- `--verbose`: token usage after every API call — input, output, cache_hit, cache_write, est_saved tokens
+- `--watch FILE`: polling hot-reload (500ms interval) — edit a prompt .txt, save, Blender auto-updates
+- `--iterate N`: auto-fix loop — on Blender execution error, Claude repairs the script up to N times
+- Removed stale `import os` (unused since v0.1)
+- `_send_raw()` extracted; `send_to_blender()` remains backward-compatible
 
 ### v0.3.0 — 2026-05-29
 - Prompt caching: SYSTEM_PROMPT wrapped in `cache_control: ephemeral` block; ~80% cost reduction on cache hits
@@ -114,4 +128,4 @@ Input modes
 
 ---
 
-*claude-blender Blueprint v0.3.0 · 2026-05-29 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.4.0 · 2026-05-29 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
