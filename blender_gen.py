@@ -11,6 +11,8 @@ Usage:
     python blender_gen.py "scatter rocks" --send --host 192.168.1.10 --port 9876
     python blender_gen.py "fix this mesh" --send --iterate 3 --verbose
     python blender_gen.py --watch prompt.txt --send
+    python blender_gen.py "city block" --preset cyberpunk -o city.py
+    python blender_gen.py "add trees" --send --diff
 """
 
 import anthropic
@@ -36,6 +38,16 @@ Rules:
 # Cached system block — reused across all calls in a session.
 # cache_control marks this as a prompt cache breakpoint (~80% cost on repeat hits).
 SYSTEM_BLOCK = [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}]
+
+# Style presets — prepended to the user prompt before Claude sees it.
+# Keys must stay lowercase (CLI choices are lowercase).
+PRESETS: dict[str, str] = {
+    "cyberpunk": "Style: neon-lit cyberpunk aesthetic — glowing emissive materials in cyan/magenta/yellow, dark metallic surfaces, wet reflective ground, volumetric fog. ",
+    "nature":    "Style: organic low-poly nature scene — earth tones, subsurface scattering on foliage, soft diffuse lighting, no sharp edges. ",
+    "abstract":  "Style: abstract geometric art — bold primary colors, hard-edge materials, dramatic directional lighting, mathematical precision. ",
+    "scifi":     "Style: hard-surface sci-fi — metallic panels with subtle emission, modular geometry, cool blue/white lighting, clean industrial aesthetic. ",
+    "toon":      "Style: toon-shaded cartoon — flat colors with Toon BSDF, thick outlines via Solidify modifier, bright saturated palette, no cast shadows. ",
+}
 
 
 # ── MCP socket helpers ────────────────────────────────────────────────────────
@@ -77,6 +89,43 @@ def send_to_blender(code: str, host: str, port: int) -> str:
     if not ok:
         raise RuntimeError(f"Blender execution error: {msg}")
     return msg
+
+
+# ── scene diff helpers ────────────────────────────────────────────────────────
+
+def _scene_object_names(scene_json: str) -> set[str]:
+    """Extract object names from scene JSON. Returns empty set on unexpected shape."""
+    try:
+        data = json.loads(scene_json)
+        objects = data.get("objects", [])
+        return {obj["name"] for obj in objects if obj.get("name")}
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        return set()
+
+
+def _print_scene_diff(before: str, after: str) -> None:
+    """Print added/removed object names between two scene snapshots."""
+    names_before = _scene_object_names(before)
+    names_after = _scene_object_names(after)
+    added = sorted(names_after - names_before)
+    removed = sorted(names_before - names_after)
+    if not added and not removed:
+        print("Diff: no object changes.", file=sys.stderr)
+        return
+    for name in added:
+        print(f"  + {name}", file=sys.stderr)
+    for name in removed:
+        print(f"  - {name}", file=sys.stderr)
+    print(f"Diff: +{len(added)} -{len(removed)} objects.", file=sys.stderr)
+
+
+def _snapshot(host: str, port: int) -> str | None:
+    """Return scene JSON snapshot, or None on connection failure."""
+    try:
+        return get_scene_info(host, port)
+    except (ConnectionRefusedError, OSError) as exc:
+        print(f"Warning: scene snapshot failed ({exc}).", file=sys.stderr)
+        return None
 
 
 # ── verbose / usage helper ────────────────────────────────────────────────────
@@ -174,6 +223,9 @@ def _execute_with_iterate(script: str, args, label: str = "") -> str:
 # ── single-prompt pipeline ────────────────────────────────────────────────────
 
 def run_single(prompt: str, args) -> None:
+    if args.preset:
+        prompt = PRESETS[args.preset] + prompt
+
     if args.scene:
         print("Fetching scene from Blender...", file=sys.stderr)
         try:
@@ -190,12 +242,19 @@ def run_single(prompt: str, args) -> None:
         print(script)
 
     if args.send:
+        scene_before = _snapshot(args.host, args.port) if args.diff else None
+
         if args.iterate:
             script = _execute_with_iterate(script, args)
             if args.output:
                 _write_file(args.output, script)  # overwrite with fixed version
         else:
             _send(script, args.host, args.port)
+
+        if scene_before is not None:
+            scene_after = _snapshot(args.host, args.port)
+            if scene_after is not None:
+                _print_scene_diff(scene_before, scene_after)
 
 
 # ── batch pipeline ────────────────────────────────────────────────────────────
@@ -209,16 +268,25 @@ def run_batch(prompts: list[str], args) -> None:
 
     for i, prompt in enumerate(prompts, start=1):
         print(f"[{i}/{total}] {prompt[:60]}", file=sys.stderr)
+        if args.preset:
+            prompt = PRESETS[args.preset] + prompt
         script = generate_blender_script(prompt, args.model, verbose=args.verbose)
         out_path = out_dir / f"{stem}_{i:03d}.py"
         _write_file(str(out_path), script)
 
         if args.send:
+            scene_before = _snapshot(args.host, args.port) if args.diff else None
+
             if args.iterate:
                 script = _execute_with_iterate(script, args, label=f"{i}/{total}")
                 _write_file(str(out_path), script)  # overwrite with fixed version
             else:
                 _send(script, args.host, args.port)
+
+            if scene_before is not None:
+                scene_after = _snapshot(args.host, args.port)
+                if scene_after is not None:
+                    _print_scene_diff(scene_before, scene_after)
 
 
 # ── watch pipeline ────────────────────────────────────────────────────────────
@@ -312,11 +380,18 @@ def main():
         "--iterate", type=int, default=0, metavar="N",
         help="Auto-fix: if Blender reports an error, re-prompt Claude up to N times (requires --send)",
     )
+    parser.add_argument("--diff", action="store_true", help="Show scene object diff before/after execution (requires --send)")
+    parser.add_argument(
+        "--preset", choices=list(PRESETS), metavar="STYLE",
+        help=f"Style preset prepended to prompt ({', '.join(PRESETS)})",
+    )
 
     args = parser.parse_args()
 
     if args.iterate and not args.send:
         parser.error("--iterate requires --send")
+    if args.diff and not args.send:
+        parser.error("--diff requires --send")
 
     if args.watch:
         run_watch(args.watch, args)

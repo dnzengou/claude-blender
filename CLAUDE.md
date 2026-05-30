@@ -18,9 +18,11 @@ python blender_gen.py --batch example_batch.txt --output-dir ./scripts/ # batch
 python blender_gen.py "scatter rocks" --send --host 192.168.1.10         # remote
 python blender_gen.py "fix rigging" --send --iterate 3 --verbose         # auto-fix
 python blender_gen.py --watch my_prompt.txt --send                       # hot-reload
+python blender_gen.py "city block" --preset cyberpunk -o city.py         # style preset
+python blender_gen.py "add trees" --send --diff                          # scene diff
 ```
 
-## Flags (v0.4)
+## Flags (v0.5)
 | Flag | Effect |
 |------|--------|
 | `--send` | Execute script in running Blender via MCP socket |
@@ -35,6 +37,8 @@ python blender_gen.py --watch my_prompt.txt --send                       # hot-r
 | `-o FILE` | Write script to file (single mode) |
 | `--verbose` | Print token usage (cache hit/miss) after each Claude call |
 | `--iterate N` | Auto-fix: re-prompt Claude up to N times on Blender error (requires `--send`) |
+| `--preset STYLE` | Inject style tokens before prompt (`cyberpunk` `nature` `abstract` `scifi` `toon`) |
+| `--diff` | Print `+added` / `-removed` object names before/after execution (requires `--send`) |
 
 ## Files
 - `blender_gen.py` — main CLI, entry point

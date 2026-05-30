@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.4.0 · 2026-05-29 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.5.0 · 2026-05-30 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -81,10 +81,15 @@ Input modes
 - [x] `--verbose`: print token usage (input/output + cache hit/write + est. tokens saved) after each call
 - [x] `--iterate N`: auto-fix loop — send script to Blender, capture error, re-prompt Claude up to N times
 
-### v0.5 — Next 🔲
-- [ ] GUI tray / system-tray launcher (click-to-generate without terminal)
-- [ ] `--diff`: show a diff of scene objects before/after execution
-- [ ] Named presets: `--preset cyberpunk / nature / abstract` inject style tokens into system prompt
+### v0.5 — Shipped ✅
+- [x] `--preset STYLE`: inject style tokens before prompt (`cyberpunk` `nature` `abstract` `scifi` `toon`)
+- [x] `--diff`: snapshot scene before/after execution, print `+added` / `-removed` object names (requires `--send`)
+- [ ] ~~GUI tray launcher~~ — deferred; needs `pystray` (native extension, not ARM-safe)
+
+### v0.6 — Next 🔲
+- [ ] `--preview`: render a thumbnail and open it after execution (`bpy.ops.render.render` + default viewer)
+- [ ] `--history FILE`: append each prompt+script pair to a JSONL log for replay
+- [ ] Multi-model routing: auto-select haiku for simple edits, opus for full scenes (heuristic word-count)
 
 ---
 
@@ -98,6 +103,12 @@ Input modes
 ---
 
 ## Changelog
+
+### v0.5.0 — 2026-05-30
+- `--preset STYLE`: 5 built-in style presets (`cyberpunk`, `nature`, `abstract`, `scifi`, `toon`) — each injects a style token string before the user prompt; pure Python dict, ARM-safe
+- `--diff`: snapshots scene via `get_scene_info` before and after execution; diffs object name sets; prints `+added`/`-removed` counts; requires `--send`; gracefully degrades on socket failure
+- GUI tray deferred — `pystray` uses native OS extensions, breaks ARM compatibility
+- `_snapshot()` helper extracted for clean before/after scene capture
 
 ### v0.4.0 — 2026-05-29
 - `--verbose`: token usage after every API call — input, output, cache_hit, cache_write, est_saved tokens
@@ -128,4 +139,4 @@ Input modes
 
 ---
 
-*claude-blender Blueprint v0.4.0 · 2026-05-29 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.5.0 · 2026-05-30 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
