@@ -13,12 +13,15 @@ Usage:
     python blender_gen.py --watch prompt.txt --send
     python blender_gen.py "city block" --preset cyberpunk -o city.py
     python blender_gen.py "add trees" --send --diff
+    python blender_gen.py "forest" --send --preview
 """
 
 import anthropic
 import argparse
 import json
+import platform
 import socket
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -48,6 +51,26 @@ PRESETS: dict[str, str] = {
     "scifi":     "Style: hard-surface sci-fi — metallic panels with subtle emission, modular geometry, cool blue/white lighting, clean industrial aesthetic. ",
     "toon":      "Style: toon-shaded cartoon — flat colors with Toon BSDF, thick outlines via Solidify modifier, bright saturated palette, no cast shadows. ",
 }
+
+# Bpy script sent to Blender to render a fast preview frame.
+# {path!r} → repr()-escaped output path; camera added if scene has none.
+RENDER_SCRIPT = """\
+import bpy
+
+if not bpy.context.scene.camera:
+    bpy.ops.object.camera_add(location=(7.36, -6.93, 4.96), rotation=(1.11, 0.0, 0.81))
+    bpy.context.scene.camera = bpy.context.object
+
+scene = bpy.context.scene
+scene.render.resolution_x = 480
+scene.render.resolution_y = 270
+scene.render.image_settings.file_format = 'PNG'
+scene.render.filepath = {path!r}
+bpy.ops.render.render(write_still=True)
+"""
+
+# Fixed preview path in user home — consistent across calls, easy to find.
+PREVIEW_PATH = str(Path.home() / ".blender_gen_preview.png")
 
 
 # ── MCP socket helpers ────────────────────────────────────────────────────────
@@ -126,6 +149,39 @@ def _snapshot(host: str, port: int) -> str | None:
     except (ConnectionRefusedError, OSError) as exc:
         print(f"Warning: scene snapshot failed ({exc}).", file=sys.stderr)
         return None
+
+
+# ── preview helpers ───────────────────────────────────────────────────────────
+
+def _open_preview(path: str) -> None:
+    """Open image in the system default viewer. Cross-platform, no native extensions."""
+    system = platform.system()
+    if system == "Darwin":
+        subprocess.Popen(["open", path])
+    elif system == "Windows":
+        # shell=True required; 'start' is a cmd built-in, not a standalone binary
+        subprocess.Popen(f'start "" "{path}"', shell=True)
+    else:
+        subprocess.Popen(["xdg-open", path])
+
+
+def _render_preview(host: str, port: int) -> None:
+    """Render a 480×270 PNG preview in Blender and open it (localhost only)."""
+    render_code = RENDER_SCRIPT.format(path=PREVIEW_PATH)
+    print("Rendering preview...", file=sys.stderr)
+    try:
+        ok, msg = _send_raw(render_code, host, port)
+    except (ConnectionRefusedError, OSError) as exc:
+        print(f"Warning: preview render failed ({exc}).", file=sys.stderr)
+        return
+    if not ok:
+        print(f"Warning: preview render error: {msg}", file=sys.stderr)
+        return
+    print(f"Preview: {PREVIEW_PATH}", file=sys.stderr)
+    if host in ("localhost", "127.0.0.1"):
+        _open_preview(PREVIEW_PATH)
+    else:
+        print(f"  (remote host — open {PREVIEW_PATH} on {host})", file=sys.stderr)
 
 
 # ── verbose / usage helper ────────────────────────────────────────────────────
@@ -256,6 +312,9 @@ def run_single(prompt: str, args) -> None:
             if scene_after is not None:
                 _print_scene_diff(scene_before, scene_after)
 
+        if args.preview:
+            _render_preview(args.host, args.port)
+
 
 # ── batch pipeline ────────────────────────────────────────────────────────────
 
@@ -287,6 +346,9 @@ def run_batch(prompts: list[str], args) -> None:
                 scene_after = _snapshot(args.host, args.port)
                 if scene_after is not None:
                     _print_scene_diff(scene_before, scene_after)
+
+            if args.preview:
+                _render_preview(args.host, args.port)
 
 
 # ── watch pipeline ────────────────────────────────────────────────────────────
@@ -381,6 +443,7 @@ def main():
         help="Auto-fix: if Blender reports an error, re-prompt Claude up to N times (requires --send)",
     )
     parser.add_argument("--diff", action="store_true", help="Show scene object diff before/after execution (requires --send)")
+    parser.add_argument("--preview", action="store_true", help="Render a 480x270 preview after execution and open it (requires --send)")
     parser.add_argument(
         "--preset", choices=list(PRESETS), metavar="STYLE",
         help=f"Style preset prepended to prompt ({', '.join(PRESETS)})",
@@ -392,6 +455,8 @@ def main():
         parser.error("--iterate requires --send")
     if args.diff and not args.send:
         parser.error("--diff requires --send")
+    if args.preview and not args.send:
+        parser.error("--preview requires --send")
 
     if args.watch:
         run_watch(args.watch, args)

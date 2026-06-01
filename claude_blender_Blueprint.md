@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.5.0 · 2026-05-30 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.6.0 · 2026-06-01 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -86,10 +86,12 @@ Input modes
 - [x] `--diff`: snapshot scene before/after execution, print `+added` / `-removed` object names (requires `--send`)
 - [ ] ~~GUI tray launcher~~ — deferred; needs `pystray` (native extension, not ARM-safe)
 
-### v0.6 — Next 🔲
-- [ ] `--preview`: render a thumbnail and open it after execution (`bpy.ops.render.render` + default viewer)
-- [ ] `--history FILE`: append each prompt+script pair to a JSONL log for replay
-- [ ] Multi-model routing: auto-select haiku for simple edits, opus for full scenes (heuristic word-count)
+### v0.6 — Shipped ✅
+- [x] `--preview`: sends a 480×270 render script to Blender after execution; opens PNG in system default viewer on localhost; prints path for remote hosts
+
+### v0.7 — Next 🔲
+- [ ] `--history FILE`: append `{ts, model, prompt, script}` JSONL record after each generation (replay log)
+- [ ] `--auto-model`: heuristic routing — haiku for short edits (≤8 words, starts with edit verb), opus for full scenes
 
 ---
 
@@ -103,6 +105,11 @@ Input modes
 ---
 
 ## Changelog
+
+### v0.6.0 — 2026-06-01
+- `--preview`: after `--send`, sends a bpy render script (480×270 PNG, auto-camera if none) to Blender via MCP socket; opens result in system default viewer on localhost (`open`/`xdg-open`/`start`); prints path only for remote hosts; degrades gracefully on any socket or render failure
+- Pure Python: `subprocess` + `platform` (stdlib) — zero native extensions, ARM-safe
+- `_render_preview()` + `_open_preview()` extracted as standalone helpers; wired into both `run_single` and `run_batch`
 
 ### v0.5.0 — 2026-05-30
 - `--preset STYLE`: 5 built-in style presets (`cyberpunk`, `nature`, `abstract`, `scifi`, `toon`) — each injects a style token string before the user prompt; pure Python dict, ARM-safe
@@ -139,4 +146,4 @@ Input modes
 
 ---
 
-*claude-blender Blueprint v0.5.0 · 2026-05-30 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.6.0 · 2026-06-01 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*

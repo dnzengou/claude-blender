@@ -20,9 +20,10 @@ python blender_gen.py "fix rigging" --send --iterate 3 --verbose         # auto-
 python blender_gen.py --watch my_prompt.txt --send                       # hot-reload
 python blender_gen.py "city block" --preset cyberpunk -o city.py         # style preset
 python blender_gen.py "add trees" --send --diff                          # scene diff
+python blender_gen.py "forest" --send --preview                          # render + open
 ```
 
-## Flags (v0.5)
+## Flags (v0.6)
 | Flag | Effect |
 |------|--------|
 | `--send` | Execute script in running Blender via MCP socket |
@@ -39,6 +40,7 @@ python blender_gen.py "add trees" --send --diff                          # scene
 | `--iterate N` | Auto-fix: re-prompt Claude up to N times on Blender error (requires `--send`) |
 | `--preset STYLE` | Inject style tokens before prompt (`cyberpunk` `nature` `abstract` `scifi` `toon`) |
 | `--diff` | Print `+added` / `-removed` object names before/after execution (requires `--send`) |
+| `--preview` | Render 480×270 PNG preview in Blender and open in default viewer (requires `--send`) |
 
 ## Files
 - `blender_gen.py` — main CLI, entry point
