@@ -21,9 +21,11 @@ python blender_gen.py --watch my_prompt.txt --send                       # hot-r
 python blender_gen.py "city block" --preset cyberpunk -o city.py         # style preset
 python blender_gen.py "add trees" --send --diff                          # scene diff
 python blender_gen.py "forest" --send --preview                          # render + open
+python blender_gen.py "add a torus" --auto-model --verbose               # → haiku
+python blender_gen.py --batch p.txt --history runs.jsonl                 # replay log
 ```
 
-## Flags (v0.6)
+## Flags (v0.7)
 | Flag | Effect |
 |------|--------|
 | `--send` | Execute script in running Blender via MCP socket |
@@ -41,6 +43,8 @@ python blender_gen.py "forest" --send --preview                          # rende
 | `--preset STYLE` | Inject style tokens before prompt (`cyberpunk` `nature` `abstract` `scifi` `toon`) |
 | `--diff` | Print `+added` / `-removed` object names before/after execution (requires `--send`) |
 | `--preview` | Render 480×270 PNG preview in Blender and open in default viewer (requires `--send`) |
+| `--history FILE` | Append `{ts, model, prompt, script}` JSONL record after each generation |
+| `--auto-model` | Route by prompt: short edits → haiku, long scenes → opus, else `--model` |
 
 ## Files
 - `blender_gen.py` — main CLI, entry point

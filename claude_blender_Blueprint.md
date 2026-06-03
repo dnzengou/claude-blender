@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.6.0 · 2026-06-01 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.7.0 · 2026-06-03 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -89,9 +89,14 @@ Input modes
 ### v0.6 — Shipped ✅
 - [x] `--preview`: sends a 480×270 render script to Blender after execution; opens PNG in system default viewer on localhost; prints path for remote hosts
 
-### v0.7 — Next 🔲
-- [ ] `--history FILE`: append `{ts, model, prompt, script}` JSONL record after each generation (replay log)
-- [ ] `--auto-model`: heuristic routing — haiku for short edits (≤8 words, starts with edit verb), opus for full scenes
+### v0.7 — Shipped ✅
+- [x] `--history FILE`: append `{ts, model, prompt, script}` JSONL record after each generation (single + batch)
+- [x] `--auto-model`: heuristic routing — short edits (≤8 words + edit verb) → haiku; long (>20 words) → opus; else `--model` default
+- [x] Hardened `--preview`: replaced Windows `subprocess(shell=True)` with `os.startfile` (no shell, safer)
+
+### v0.8 — Next 🔲
+- [ ] `--cost`: estimate USD spend per call from cached pricing table (input/output/cache token rates)
+- [ ] `--dry-run`: print expanded prompt + chosen model without making API call
 
 ---
 
@@ -105,6 +110,13 @@ Input modes
 ---
 
 ## Changelog
+
+### v0.7.0 — 2026-06-03
+- `--history FILE`: append-mode JSONL log; one record per generation with UTC isoformat timestamp, model, expanded prompt, output script; survives parallel processes
+- `--auto-model`: word-count + verb-prefix heuristic; short edit verbs route to haiku for speed, long descriptions route to opus for quality, neutral prompts honour `--model`
+- Security hardening: Windows preview opener now uses `os.startfile` (stdlib) — eliminates `shell=True`; ARM/Linux/macOS paths unchanged
+- `EDIT_VERBS` constant: 13 verbs covering common edit intents (add/remove/move/scale/rotate/...)
+- Verified routing live: "add a red cube" → haiku, "spinning torus" → default, 20+ word scene → opus
 
 ### v0.6.0 — 2026-06-01
 - `--preview`: after `--send`, sends a bpy render script (480×270 PNG, auto-camera if none) to Blender via MCP socket; opens result in system default viewer on localhost (`open`/`xdg-open`/`start`); prints path only for remote hosts; degrades gracefully on any socket or render failure
@@ -146,4 +158,4 @@ Input modes
 
 ---
 
-*claude-blender Blueprint v0.6.0 · 2026-06-01 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.7.0 · 2026-06-03 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*

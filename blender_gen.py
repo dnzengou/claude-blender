@@ -14,16 +14,20 @@ Usage:
     python blender_gen.py "city block" --preset cyberpunk -o city.py
     python blender_gen.py "add trees" --send --diff
     python blender_gen.py "forest" --send --preview
+    python blender_gen.py "add a torus" --auto-model --verbose       # → haiku
+    python blender_gen.py --batch p.txt --history runs.jsonl         # replay log
 """
 
 import anthropic
 import argparse
 import json
+import os
 import platform
 import socket
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 MCP_TIMEOUT = 10  # seconds
@@ -159,8 +163,8 @@ def _open_preview(path: str) -> None:
     if system == "Darwin":
         subprocess.Popen(["open", path])
     elif system == "Windows":
-        # shell=True required; 'start' is a cmd built-in, not a standalone binary
-        subprocess.Popen(f'start "" "{path}"', shell=True)
+        # os.startfile avoids shell=True; safer than subprocess(start, shell=True)
+        os.startfile(path)  # noqa: S606 - Windows-only stdlib API
     else:
         subprocess.Popen(["xdg-open", path])
 
@@ -182,6 +186,41 @@ def _render_preview(host: str, port: int) -> None:
         _open_preview(PREVIEW_PATH)
     else:
         print(f"  (remote host — open {PREVIEW_PATH} on {host})", file=sys.stderr)
+
+
+# ── history / auto-model helpers ──────────────────────────────────────────────
+
+# Verbs that signal a small targeted edit rather than a full-scene build.
+EDIT_VERBS = {"add", "remove", "delete", "move", "scale", "rotate", "set", "change",
+              "rename", "color", "tint", "shift", "translate", "duplicate"}
+
+
+def _pick_model(prompt: str, default: str) -> str:
+    """Heuristic: short imperative edit → haiku; full-scene description → opus.
+    Returns default if the prompt does not match either pattern."""
+    words = prompt.strip().lower().split()
+    if not words:
+        return default
+    if len(words) <= 8 and words[0] in EDIT_VERBS:
+        return "claude-haiku-4-5-20251001"
+    if len(words) > 20:
+        return "claude-opus-4-7"
+    return default
+
+
+def _log_history(path: str, model: str, prompt: str, script: str) -> None:
+    """Append one JSONL record per generation. Safe to share across processes (append-mode)."""
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "model": model,
+        "prompt": prompt,
+        "script": script,
+    }
+    try:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")
+    except OSError as exc:
+        print(f"Warning: history write failed ({exc}).", file=sys.stderr)
 
 
 # ── verbose / usage helper ────────────────────────────────────────────────────
@@ -290,7 +329,14 @@ def run_single(prompt: str, args) -> None:
         except (ConnectionRefusedError, OSError) as exc:
             print(f"Warning: cannot reach Blender MCP ({exc}). Ignoring --scene.", file=sys.stderr)
 
-    script = generate_blender_script(prompt, args.model, stream=args.stream, verbose=args.verbose)
+    model = _pick_model(prompt, args.model) if args.auto_model else args.model
+    if args.auto_model and args.verbose:
+        print(f"auto-model: {model}", file=sys.stderr)
+
+    script = generate_blender_script(prompt, model, stream=args.stream, verbose=args.verbose)
+
+    if args.history:
+        _log_history(args.history, model, prompt, script)
 
     if args.output:
         _write_file(args.output, script)
@@ -329,9 +375,15 @@ def run_batch(prompts: list[str], args) -> None:
         print(f"[{i}/{total}] {prompt[:60]}", file=sys.stderr)
         if args.preset:
             prompt = PRESETS[args.preset] + prompt
-        script = generate_blender_script(prompt, args.model, verbose=args.verbose)
+        model = _pick_model(prompt, args.model) if args.auto_model else args.model
+        if args.auto_model and args.verbose:
+            print(f"  auto-model: {model}", file=sys.stderr)
+        script = generate_blender_script(prompt, model, verbose=args.verbose)
         out_path = out_dir / f"{stem}_{i:03d}.py"
         _write_file(str(out_path), script)
+
+        if args.history:
+            _log_history(args.history, model, prompt, script)
 
         if args.send:
             scene_before = _snapshot(args.host, args.port) if args.diff else None
@@ -447,6 +499,14 @@ def main():
     parser.add_argument(
         "--preset", choices=list(PRESETS), metavar="STYLE",
         help=f"Style preset prepended to prompt ({', '.join(PRESETS)})",
+    )
+    parser.add_argument(
+        "--history", metavar="FILE",
+        help="Append JSONL {ts, model, prompt, script} record after each generation",
+    )
+    parser.add_argument(
+        "--auto-model", action="store_true",
+        help="Route by prompt: short edits (≤8 words + edit verb) → haiku; long (>20 words) → opus",
     )
 
     args = parser.parse_args()
