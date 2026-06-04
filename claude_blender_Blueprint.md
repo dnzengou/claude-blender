@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.7.0 · 2026-06-03 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.7.1 · 2026-06-04 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -100,6 +100,44 @@ Input modes
 
 ---
 
+## Workflow Genome (Evolved · v0.4→v0.7 lineage)
+
+EvoMetaClaw-extracted ESS for shipping a new flag in this project.
+Mutate freely; do not splice across boundaries.
+
+```
+add_flag(NAME, EFFECT):
+  1. module-level constant or helper       (PRESETS dict, RENDER_SCRIPT, EDIT_VERBS)
+  2. private _-prefixed helper             (_snapshot, _render_preview, _log_history)
+  3. wire into run_single                  (after generation, before/after _send)
+  4. wire into run_batch                   (per item, same order)
+  5. CLI argparse arg with help string     (verbose mode bonus: print decision)
+  6. parser.error guard if depends on flag (e.g. --diff requires --send)
+  7. py_compile + ruff check                (gate: 0 errors before commit)
+  8. blueprint: shipped ✅ + changelog entry + footer bump
+  9. CLAUDE.md flags table + run example   (one-line per flag)
+ 10. memory: state file flag list + next roadmap
+ 11. git add SPECIFIC files (not -A)
+ 12. heredoc commit msg with Co-Authored-By
+ 13. push origin main
+```
+
+**Invariants (broken = circuit breaker):**
+- pure Python stdlib only · no native extensions (ARM constraint)
+- composable with `--send` / `--batch` / `--watch` (no flag is mutex with these)
+- graceful degradation on any socket/file failure (warn + continue, never crash)
+- no hardcoded secrets · `ANTHROPIC_API_KEY` is the only auth surface
+- `shell=True` forbidden when stdlib has a native API (e.g. `os.startfile`)
+
+**Mutation history:**
+| Epoch | Diversity injected | Trigger |
+|-------|-------------------|---------|
+| v0.5 | `--preset` + `--diff` | Circuit breaker: GUI tray rejected (pystray = native) |
+| v0.6 | `--preview` | Visual feedback gap detected post-v0.5 |
+| v0.7 | `--auto-model` + security harden | Cost-optimisation + grep audit finding |
+
+---
+
 ## API Integrations
 
 | API | Auth | Usage |
@@ -110,6 +148,10 @@ Input modes
 ---
 
 ## Changelog
+
+### v0.7.1 — 2026-06-04
+- Docs: added **Workflow Genome** section — EvoMetaClaw-extracted ESS pattern from v0.4→v0.7 lineage; 13-step recipe for adding a new flag; invariants list (ARM/composability/graceful degradation/no shell=True/no hardcoded secrets); mutation history table with circuit-breaker triggers
+- No code changes; reduces re-derivation cost for future contributors and future Claude sessions
 
 ### v0.7.0 — 2026-06-03
 - `--history FILE`: append-mode JSONL log; one record per generation with UTC isoformat timestamp, model, expanded prompt, output script; survives parallel processes
@@ -158,4 +200,4 @@ Input modes
 
 ---
 
-*claude-blender Blueprint v0.7.0 · 2026-06-03 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.7.1 · 2026-06-04 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
