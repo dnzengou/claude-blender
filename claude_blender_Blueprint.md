@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.7.1 · 2026-06-04 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.8.0 · 2026-06-05 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -47,6 +47,7 @@ Input modes
 | `example_batch.txt` | sample batch prompts file (5 scenes) |
 | `prompts/mcp_prompts.md` | Claude Desktop × BlenderMCP prompt library (6 examples) |
 | `scenes/cyberpunk_city.py` | reference bpy scene: cyberpunk city grid |
+| `scenes/space_metaverse.py` | reference bpy scene: geospatial persistent 3D world (Earth/Moon/Mars) |
 | `README.md` | GitHub repo landing page |
 | `LICENSE` | MIT |
 | `.github/workflows/ci.yml` | GitHub Actions CI (lint + syntax, ARM + x86) |
@@ -94,9 +95,13 @@ Input modes
 - [x] `--auto-model`: heuristic routing — short edits (≤8 words + edit verb) → haiku; long (>20 words) → opus; else `--model` default
 - [x] Hardened `--preview`: replaced Windows `subprocess(shell=True)` with `os.startfile` (no shell, safer)
 
-### v0.8 — Next 🔲
+### v0.8 — Shipped ✅ (niche mutation: tool → content)
+- [x] `scenes/space_metaverse.py` — geospatial persistent 3D world reference scene; equirectangular lat/lon → world XY (Galileo proxy); procedural terrain (DEM proxy); translucent climate overlay (Copernicus proxy); per-planet config (Earth/Moon/Mars) with deterministic seed; persistent session log at `~/.space_metaverse_state.json` (bounded to last 50 entries); pure bpy + stdlib
+
+### v0.9 — Next 🔲
 - [ ] `--cost`: estimate USD spend per call from cached pricing table (input/output/cache token rates)
 - [ ] `--dry-run`: print expanded prompt + chosen model without making API call
+- [ ] `scenes/space_metaverse.py` extensions: real Copernicus DEM tile fetch (offline cached), real Galileo PRN markers, day/night terminator
 
 ---
 
@@ -135,6 +140,7 @@ add_flag(NAME, EFFECT):
 | v0.5 | `--preset` + `--diff` | Circuit breaker: GUI tray rejected (pystray = native) |
 | v0.6 | `--preview` | Visual feedback gap detected post-v0.5 |
 | v0.7 | `--auto-model` + security harden | Cost-optimisation + grep audit finding |
+| v0.8 | `scenes/space_metaverse.py` (**niche jump**: CLI flag → content asset) | EvoMetaClaw signal from external script: bridge geospatial + persistent + 3D world |
 
 ---
 
@@ -148,6 +154,17 @@ add_flag(NAME, EFFECT):
 ---
 
 ## Changelog
+
+### v0.8.0 — 2026-06-05
+- `scenes/space_metaverse.py` (~150 LOC, pure bpy + stdlib) — implements the "Bridging Space Data & Gaming Innovation" deck as a runnable reference scene:
+  - **Geospatial backbone**: equirectangular `latlon_to_xy()` projection (Galileo GNSS proxy)
+  - **Persistent world**: JSON session log at `~/.space_metaverse_state.json` with bounded history (last 50)
+  - **3D immersive**: subdivided plane terrain with deterministic procedural displacement (DEM proxy), translucent emissive climate overlay (Copernicus proxy), sun light, framed camera
+  - **Multi-planet**: `PLANET = "earth" | "moon" | "mars"` switch; per-planet color/seed/sun-energy/amplitude
+  - **6 Galileo markers**: Equator-Null, Paris, Tokyo, Rio, Sydney, McMurdo
+  - **Render engine auto-detect**: Eevee Next on 4.2+, fallback to Eevee
+- Niche jump: project mutates from CLI-flag niche (v0.4→v0.7) to content-asset niche (v0.8); Workflow Genome recipe still applies (steps 1-2,7-13)
+- Blueprint mutation history table extended; v0.9 roadmap seeded with both CLI cost flags and space scene extensions
 
 ### v0.7.1 — 2026-06-04
 - Docs: added **Workflow Genome** section — EvoMetaClaw-extracted ESS pattern from v0.4→v0.7 lineage; 13-step recipe for adding a new flag; invariants list (ARM/composability/graceful degradation/no shell=True/no hardcoded secrets); mutation history table with circuit-breaker triggers
@@ -200,4 +217,4 @@ add_flag(NAME, EFFECT):
 
 ---
 
-*claude-blender Blueprint v0.7.1 · 2026-06-04 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.8.0 · 2026-06-05 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*

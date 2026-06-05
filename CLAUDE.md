@@ -51,6 +51,8 @@ python blender_gen.py --batch p.txt --history runs.jsonl                 # repla
 - `requirements.txt` — single dep: anthropic
 - `.gitignore` — excludes .env, caches, venvs
 - `.github/workflows/ci.yml` — ruff lint + py_compile on push
+- `scenes/cyberpunk_city.py` — reference scene: cyberpunk city grid
+- `scenes/space_metaverse.py` — reference scene: geospatial persistent 3D world (Earth/Moon/Mars, Galileo markers, Copernicus climate overlay)
 
 ## Conventions
 - No native C extensions; stays ARM-compatible
