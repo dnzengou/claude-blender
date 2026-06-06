@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.8.0 · 2026-06-05 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.9.0 · 2026-06-06 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -98,10 +98,14 @@ Input modes
 ### v0.8 — Shipped ✅ (niche mutation: tool → content)
 - [x] `scenes/space_metaverse.py` — geospatial persistent 3D world reference scene; equirectangular lat/lon → world XY (Galileo proxy); procedural terrain (DEM proxy); translucent climate overlay (Copernicus proxy); per-planet config (Earth/Moon/Mars) with deterministic seed; persistent session log at `~/.space_metaverse_state.json` (bounded to last 50 entries); pure bpy + stdlib
 
-### v0.9 — Next 🔲
-- [ ] `--cost`: estimate USD spend per call from cached pricing table (input/output/cache token rates)
-- [ ] `--dry-run`: print expanded prompt + chosen model without making API call
+### v0.9 — Shipped ✅
+- [x] `--cost`: per-million-token PRICING table (opus/sonnet/haiku); `_estimate_cost()` computes USD from input + output + cache_read + cache_write; prints after each call
+- [x] `--dry-run`: skips API call; prints resolved model + prompt preview (240 chars); composable with `--auto-model` for routing inspection; downstream (send/diff/preview/history) skipped on empty script
+
+### v0.10 — Next 🔲
 - [ ] `scenes/space_metaverse.py` extensions: real Copernicus DEM tile fetch (offline cached), real Galileo PRN markers, day/night terminator
+- [ ] `--cost-budget USD`: hard-stop a batch run when cumulative cost exceeds threshold
+- [ ] `--explain`: append a one-paragraph design rationale comment block to generated scripts
 
 ---
 
@@ -141,6 +145,7 @@ add_flag(NAME, EFFECT):
 | v0.6 | `--preview` | Visual feedback gap detected post-v0.5 |
 | v0.7 | `--auto-model` + security harden | Cost-optimisation + grep audit finding |
 | v0.8 | `scenes/space_metaverse.py` (**niche jump**: CLI flag → content asset) | EvoMetaClaw signal from external script: bridge geospatial + persistent + 3D world |
+| v0.9 | `--cost` + `--dry-run` (**niche return**: CLI flag) | EvoMetaClaw paired-flag complement to `--auto-model` (preview routing + spend before commit) |
 
 ---
 
@@ -154,6 +159,12 @@ add_flag(NAME, EFFECT):
 ---
 
 ## Changelog
+
+### v0.9.0 — 2026-06-06
+- `--cost`: prints `Cost: $0.XXXX  (model=...)` after every Claude call; PRICING dict at module-level for 3 models; `_estimate_cost()` correctly weighs input/output/cache_read/cache_write per Anthropic billing semantics; falls back to "unknown" if model not in PRICING (safe default)
+- `--dry-run`: prints `[DRY RUN] model=X  prompt=...` to stderr, returns `""`, generation function exits early; both `run_single` and `run_batch` short-circuit on empty script (skip send/diff/preview/history); composes with `--auto-model` to preview routing without spending
+- Self-tested: opus=$0.029/sonnet=$0.006/haiku=$0.002 on a 245-in/312-out/1200-cache_read call; cache_write call ~45% more expensive than cache_read call as expected
+- Mutation history extended: niche-return to CLI flags after v0.8 content jump; v0.10 roadmap seeds `--cost-budget`, `--explain`, space-metaverse data extensions
 
 ### v0.8.0 — 2026-06-05
 - `scenes/space_metaverse.py` (~150 LOC, pure bpy + stdlib) — implements the "Bridging Space Data & Gaming Innovation" deck as a runnable reference scene:
@@ -217,4 +228,4 @@ add_flag(NAME, EFFECT):
 
 ---
 
-*claude-blender Blueprint v0.8.0 · 2026-06-05 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.9.0 · 2026-06-06 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*

@@ -16,6 +16,8 @@ Usage:
     python blender_gen.py "forest" --send --preview
     python blender_gen.py "add a torus" --auto-model --verbose       # → haiku
     python blender_gen.py --batch p.txt --history runs.jsonl         # replay log
+    python blender_gen.py "neon city" --dry-run --auto-model         # plan only
+    python blender_gen.py "forest" --cost --verbose                  # show spend
 """
 
 import anthropic
@@ -75,6 +77,15 @@ bpy.ops.render.render(write_still=True)
 
 # Fixed preview path in user home — consistent across calls, easy to find.
 PREVIEW_PATH = str(Path.home() / ".blender_gen_preview.png")
+
+# Per-million-token USD rates: (input, output, cache_read, cache_write).
+# Approximate public pricing pattern: cache_read ≈ 10% of input, cache_write ≈ 1.25× input, output ≈ 5× input.
+# Update from anthropic.com/pricing when models change.
+PRICING: dict[str, tuple] = {
+    "claude-opus-4-7":            (15.00, 75.00, 1.50, 18.75),
+    "claude-sonnet-4-6":          ( 3.00, 15.00, 0.30,  3.75),
+    "claude-haiku-4-5-20251001":  ( 0.80,  4.00, 0.08,  1.00),
+}
 
 
 # ── MCP socket helpers ────────────────────────────────────────────────────────
@@ -237,10 +248,43 @@ def _print_usage(usage) -> None:
     )
 
 
+def _estimate_cost(usage, model: str) -> float | None:
+    """Return USD cost estimate for one call. None if model has no PRICING entry."""
+    rates = PRICING.get(model)
+    if rates is None:
+        return None
+    in_r, out_r, cr_r, cw_r = rates
+    in_tok = (usage.input_tokens or 0)
+    out_tok = (usage.output_tokens or 0)
+    cr_tok = getattr(usage, "cache_read_input_tokens", 0) or 0
+    cw_tok = getattr(usage, "cache_creation_input_tokens", 0) or 0
+    # Anthropic billing: input_tokens excludes cache_read + cache_creation tokens (each priced separately).
+    return (in_tok * in_r + out_tok * out_r + cr_tok * cr_r + cw_tok * cw_r) / 1_000_000
+
+
+def _print_cost(usage, model: str) -> None:
+    """Print one-line USD cost estimate to stderr."""
+    cost = _estimate_cost(usage, model)
+    if cost is None:
+        print(f"Cost: unknown (no PRICING entry for {model})", file=sys.stderr)
+        return
+    print(f"Cost: ${cost:.4f}  (model={model})", file=sys.stderr)
+
+
 # ── Claude generation ─────────────────────────────────────────────────────────
 
-def generate_blender_script(prompt: str, model: str, stream: bool = False, verbose: bool = False) -> str:
-    """Call Claude with a cached system prompt. Returns complete bpy script."""
+def generate_blender_script(prompt: str, model: str, stream: bool = False, verbose: bool = False,
+                             show_cost: bool = False, dry_run: bool = False) -> str:
+    """Call Claude with a cached system prompt. Returns complete bpy script.
+
+    dry_run=True skips the API call, prints the resolved model + prompt preview, returns "".
+    """
+    if dry_run:
+        preview = prompt if len(prompt) <= 240 else prompt[:240] + "…"
+        print(f"[DRY RUN] model={model}", file=sys.stderr)
+        print(f"[DRY RUN] prompt={preview}", file=sys.stderr)
+        return ""
+
     client = anthropic.Anthropic()
 
     kwargs = dict(
@@ -257,13 +301,18 @@ def generate_blender_script(prompt: str, model: str, stream: bool = False, verbo
                 print(text, end="", flush=True)
                 parts.append(text)
         print()
+        final = s.get_final_message()
         if verbose:
-            _print_usage(s.get_final_message().usage)
+            _print_usage(final.usage)
+        if show_cost:
+            _print_cost(final.usage, model)
         return "".join(parts)
 
     response = client.messages.create(**kwargs)
     if verbose:
         _print_usage(response.usage)
+    if show_cost:
+        _print_cost(response.usage, model)
     return response.content[0].text
 
 
@@ -330,10 +379,17 @@ def run_single(prompt: str, args) -> None:
             print(f"Warning: cannot reach Blender MCP ({exc}). Ignoring --scene.", file=sys.stderr)
 
     model = _pick_model(prompt, args.model) if args.auto_model else args.model
-    if args.auto_model and args.verbose:
+    if args.auto_model and (args.verbose or args.dry_run):
         print(f"auto-model: {model}", file=sys.stderr)
 
-    script = generate_blender_script(prompt, model, stream=args.stream, verbose=args.verbose)
+    script = generate_blender_script(
+        prompt, model,
+        stream=args.stream, verbose=args.verbose,
+        show_cost=args.cost, dry_run=args.dry_run,
+    )
+
+    if not script:  # dry-run path; nothing downstream applies
+        return
 
     if args.history:
         _log_history(args.history, model, prompt, script)
@@ -376,9 +432,14 @@ def run_batch(prompts: list[str], args) -> None:
         if args.preset:
             prompt = PRESETS[args.preset] + prompt
         model = _pick_model(prompt, args.model) if args.auto_model else args.model
-        if args.auto_model and args.verbose:
+        if args.auto_model and (args.verbose or args.dry_run):
             print(f"  auto-model: {model}", file=sys.stderr)
-        script = generate_blender_script(prompt, model, verbose=args.verbose)
+        script = generate_blender_script(
+            prompt, model,
+            verbose=args.verbose, show_cost=args.cost, dry_run=args.dry_run,
+        )
+        if not script:  # dry-run; skip file write + downstream
+            continue
         out_path = out_dir / f"{stem}_{i:03d}.py"
         _write_file(str(out_path), script)
 
@@ -507,6 +568,14 @@ def main():
     parser.add_argument(
         "--auto-model", action="store_true",
         help="Route by prompt: short edits (≤8 words + edit verb) → haiku; long (>20 words) → opus",
+    )
+    parser.add_argument(
+        "--cost", action="store_true",
+        help="Print USD cost estimate after each Claude call (uses PRICING table)",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Skip the API call; print resolved model + prompt preview only",
     )
 
     args = parser.parse_args()

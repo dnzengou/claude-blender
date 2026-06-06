@@ -23,9 +23,11 @@ python blender_gen.py "add trees" --send --diff                          # scene
 python blender_gen.py "forest" --send --preview                          # render + open
 python blender_gen.py "add a torus" --auto-model --verbose               # → haiku
 python blender_gen.py --batch p.txt --history runs.jsonl                 # replay log
+python blender_gen.py "neon city" --dry-run --auto-model                 # plan only
+python blender_gen.py "forest" --cost --verbose                          # show spend
 ```
 
-## Flags (v0.7)
+## Flags (v0.9)
 | Flag | Effect |
 |------|--------|
 | `--send` | Execute script in running Blender via MCP socket |
@@ -45,6 +47,8 @@ python blender_gen.py --batch p.txt --history runs.jsonl                 # repla
 | `--preview` | Render 480×270 PNG preview in Blender and open in default viewer (requires `--send`) |
 | `--history FILE` | Append `{ts, model, prompt, script}` JSONL record after each generation |
 | `--auto-model` | Route by prompt: short edits → haiku, long scenes → opus, else `--model` |
+| `--cost` | Print USD cost estimate after each Claude call (PRICING table) |
+| `--dry-run` | Skip the API call; print resolved model + prompt preview only |
 
 ## Files
 - `blender_gen.py` — main CLI, entry point
