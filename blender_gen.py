@@ -18,6 +18,8 @@ Usage:
     python blender_gen.py --batch p.txt --history runs.jsonl         # replay log
     python blender_gen.py "neon city" --dry-run --auto-model         # plan only
     python blender_gen.py "forest" --cost --verbose                  # show spend
+    python blender_gen.py --batch p.txt --cost-budget 0.25            # halt on budget
+    python blender_gen.py "donut" --explain                          # add rationale
 """
 
 import anthropic
@@ -273,12 +275,24 @@ def _print_cost(usage, model: str) -> None:
 
 # ── Claude generation ─────────────────────────────────────────────────────────
 
+EXPLAIN_SUFFIX = (
+    "\n\nAdditionally: prepend a Python comment block of the form\n"
+    "# Design rationale:\n# <2-3 sentences explaining the approach, key choices, and trade-offs>\n"
+    "before the import line."
+)
+
+
 def generate_blender_script(prompt: str, model: str, stream: bool = False, verbose: bool = False,
-                             show_cost: bool = False, dry_run: bool = False) -> str:
+                             show_cost: bool = False, dry_run: bool = False,
+                             explain: bool = False, cost_sink: list | None = None) -> str:
     """Call Claude with a cached system prompt. Returns complete bpy script.
 
     dry_run=True skips the API call, prints the resolved model + prompt preview, returns "".
+    cost_sink, if a list, has the per-call USD cost appended (None-safe entries skipped).
     """
+    if explain:
+        prompt = prompt + EXPLAIN_SUFFIX
+
     if dry_run:
         preview = prompt if len(prompt) <= 240 else prompt[:240] + "…"
         print(f"[DRY RUN] model={model}", file=sys.stderr)
@@ -294,6 +308,16 @@ def generate_blender_script(prompt: str, model: str, stream: bool = False, verbo
         messages=[{"role": "user", "content": prompt}],
     )
 
+    def _post(usage):
+        if verbose:
+            _print_usage(usage)
+        if show_cost:
+            _print_cost(usage, model)
+        if cost_sink is not None:
+            c = _estimate_cost(usage, model)
+            if c is not None:
+                cost_sink.append(c)
+
     if stream:
         parts = []
         with client.messages.stream(**kwargs) as s:
@@ -301,18 +325,11 @@ def generate_blender_script(prompt: str, model: str, stream: bool = False, verbo
                 print(text, end="", flush=True)
                 parts.append(text)
         print()
-        final = s.get_final_message()
-        if verbose:
-            _print_usage(final.usage)
-        if show_cost:
-            _print_cost(final.usage, model)
+        _post(s.get_final_message().usage)
         return "".join(parts)
 
     response = client.messages.create(**kwargs)
-    if verbose:
-        _print_usage(response.usage)
-    if show_cost:
-        _print_cost(response.usage, model)
+    _post(response.usage)
     return response.content[0].text
 
 
@@ -386,6 +403,7 @@ def run_single(prompt: str, args) -> None:
         prompt, model,
         stream=args.stream, verbose=args.verbose,
         show_cost=args.cost, dry_run=args.dry_run,
+        explain=args.explain,
     )
 
     if not script:  # dry-run path; nothing downstream applies
@@ -426,6 +444,7 @@ def run_batch(prompts: list[str], args) -> None:
 
     stem = Path(args.batch).stem
     total = len(prompts)
+    cost_sink: list = [] if args.cost_budget is not None else None
 
     for i, prompt in enumerate(prompts, start=1):
         print(f"[{i}/{total}] {prompt[:60]}", file=sys.stderr)
@@ -437,7 +456,18 @@ def run_batch(prompts: list[str], args) -> None:
         script = generate_blender_script(
             prompt, model,
             verbose=args.verbose, show_cost=args.cost, dry_run=args.dry_run,
+            explain=args.explain, cost_sink=cost_sink,
         )
+
+        # Budget gate: halt before next call once cumulative spend exceeds threshold
+        if cost_sink is not None and args.cost_budget is not None:
+            spent = sum(cost_sink)
+            if spent > args.cost_budget:
+                print(f"Cost budget ${args.cost_budget:.4f} exceeded "
+                      f"(cumulative ${spent:.4f} after {i} call(s)). Halting batch.",
+                      file=sys.stderr)
+                break
+
         if not script:  # dry-run; skip file write + downstream
             continue
         out_path = out_dir / f"{stem}_{i:03d}.py"
@@ -577,6 +607,14 @@ def main():
         "--dry-run", action="store_true",
         help="Skip the API call; print resolved model + prompt preview only",
     )
+    parser.add_argument(
+        "--cost-budget", type=float, metavar="USD", default=None,
+        help="Halt batch run once cumulative cost exceeds USD threshold (batch only)",
+    )
+    parser.add_argument(
+        "--explain", action="store_true",
+        help="Ask Claude to prepend a '# Design rationale:' comment block to the script",
+    )
 
     args = parser.parse_args()
 
@@ -586,6 +624,8 @@ def main():
         parser.error("--diff requires --send")
     if args.preview and not args.send:
         parser.error("--preview requires --send")
+    if args.cost_budget is not None and not args.batch:
+        parser.error("--cost-budget requires --batch")
 
     if args.watch:
         run_watch(args.watch, args)

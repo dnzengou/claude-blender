@@ -25,9 +25,11 @@ python blender_gen.py "add a torus" --auto-model --verbose               # → h
 python blender_gen.py --batch p.txt --history runs.jsonl                 # replay log
 python blender_gen.py "neon city" --dry-run --auto-model                 # plan only
 python blender_gen.py "forest" --cost --verbose                          # show spend
+python blender_gen.py --batch p.txt --cost-budget 0.25                   # halt on budget
+python blender_gen.py "donut" --explain                                  # add rationale
 ```
 
-## Flags (v0.9)
+## Flags (v0.10)
 | Flag | Effect |
 |------|--------|
 | `--send` | Execute script in running Blender via MCP socket |
@@ -49,6 +51,8 @@ python blender_gen.py "forest" --cost --verbose                          # show 
 | `--auto-model` | Route by prompt: short edits → haiku, long scenes → opus, else `--model` |
 | `--cost` | Print USD cost estimate after each Claude call (PRICING table) |
 | `--dry-run` | Skip the API call; print resolved model + prompt preview only |
+| `--cost-budget USD` | Halt batch once cumulative cost exceeds USD threshold (requires `--batch`) |
+| `--explain` | Prepend a `# Design rationale:` comment block to the generated script |
 
 ## Files
 - `blender_gen.py` — main CLI, entry point

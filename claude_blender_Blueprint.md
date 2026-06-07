@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.9.0 · 2026-06-06 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.10.0 · 2026-06-07 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -102,10 +102,15 @@ Input modes
 - [x] `--cost`: per-million-token PRICING table (opus/sonnet/haiku); `_estimate_cost()` computes USD from input + output + cache_read + cache_write; prints after each call
 - [x] `--dry-run`: skips API call; prints resolved model + prompt preview (240 chars); composable with `--auto-model` for routing inspection; downstream (send/diff/preview/history) skipped on empty script
 
-### v0.10 — Next 🔲
-- [ ] `scenes/space_metaverse.py` extensions: real Copernicus DEM tile fetch (offline cached), real Galileo PRN markers, day/night terminator
-- [ ] `--cost-budget USD`: hard-stop a batch run when cumulative cost exceeds threshold
-- [ ] `--explain`: append a one-paragraph design rationale comment block to generated scripts
+### v0.10 — Shipped ✅ (dual-niche: content + CLI flags)
+- [x] `scenes/space_metaverse.py` extensions: 24-satellite Galileo PRN constellation (3 planes × 8 slots, 56° inclination, analytic ground-track); UTC-driven sun azimuth (subsolar longitude); translucent night-hemisphere overlay; SHOW_GALILEO / SHOW_NIGHT / USE_REAL_SUN flags; Earth-only gates (Moon/Mars unaffected)
+- [x] `--cost-budget USD`: tracks cumulative spend via `cost_sink` list passed into `generate_blender_script`; halts batch on first call exceeding threshold (atomic per call, not per token); requires `--batch`
+- [x] `--explain`: appends `EXPLAIN_SUFFIX` to user prompt asking Claude to prepend a `# Design rationale:` comment block; cache-safe (only user prompt mutated, SYSTEM_BLOCK untouched)
+
+### v0.11 — Next 🔲
+- [ ] `--theme FILE`: load a user-defined style preset from JSON/YAML (extends `PRESETS` at runtime)
+- [ ] `scenes/space_metaverse.py` extension: orbit-path traces for Galileo PRNs (curve objects)
+- [ ] `--save-state FILE`: persist `args` namespace + last prompt to a `.jsonl` rerun log
 
 ---
 
@@ -146,6 +151,7 @@ add_flag(NAME, EFFECT):
 | v0.7 | `--auto-model` + security harden | Cost-optimisation + grep audit finding |
 | v0.8 | `scenes/space_metaverse.py` (**niche jump**: CLI flag → content asset) | EvoMetaClaw signal from external script: bridge geospatial + persistent + 3D world |
 | v0.9 | `--cost` + `--dry-run` (**niche return**: CLI flag) | EvoMetaClaw paired-flag complement to `--auto-model` (preview routing + spend before commit) |
+| v0.10 | `--cost-budget` + `--explain` + space_metaverse Galileo/night extensions (**dual niche**) | EvoMetaClaw simultaneous content+CLI evolution — recipe absorbs both axes in one epoch |
 
 ---
 
@@ -159,6 +165,19 @@ add_flag(NAME, EFFECT):
 ---
 
 ## Changelog
+
+### v0.10.0 — 2026-06-07
+- `scenes/space_metaverse.py`:
+  - **Galileo PRN constellation**: 24 satellites (3 planes × 8 slots) with analytic ground-track from 56° inclination + RAAN + mean anomaly; rendered as cyan emissive spheres at Z=14 (altitude proxy); Earth-only
+  - **UTC-driven sun**: `subsolar_lon_utc()` (simplified, eq. of time = 0); `add_lighting()` rotates sun azimuth by subsolar longitude when `USE_REAL_SUN=True`
+  - **Night-hemisphere overlay**: translucent dark plane centred on antisolar longitude (180° from subsolar); half-width to cover one hemisphere
+  - 3 new module flags: `SHOW_GALILEO`, `SHOW_NIGHT`, `USE_REAL_SUN`; persistent state now logs `last_subsolar_lon` + per-session `galileo` count
+- `blender_gen.py`:
+  - **`--cost-budget USD`**: `cost_sink` list passed through `generate_blender_script`; `_estimate_cost` appends to it; batch loop sums after each call and breaks before the next call when threshold exceeded; requires `--batch` (guarded)
+  - **`--explain`**: `EXPLAIN_SUFFIX` constant appended to user prompt (not SYSTEM_PROMPT) → cache stays valid; Claude prepends `# Design rationale:` block before `import bpy`
+  - `_post(usage)` inner helper extracted in `generate_blender_script` to share verbose+cost+cost_sink between stream and non-stream paths
+- Self-tested: Galileo lat range exactly ±56°, 24 sats total; subsolar formula verified against current UTC
+- v0.11 roadmap seeds `--theme FILE`, orbit-path traces, `--save-state FILE`
 
 ### v0.9.0 — 2026-06-06
 - `--cost`: prints `Cost: $0.XXXX  (model=...)` after every Claude call; PRICING dict at module-level for 3 models; `_estimate_cost()` correctly weighs input/output/cache_read/cache_write per Anthropic billing semantics; falls back to "unknown" if model not in PRICING (safe default)
@@ -228,4 +247,4 @@ add_flag(NAME, EFFECT):
 
 ---
 
-*claude-blender Blueprint v0.9.0 · 2026-06-06 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.10.0 · 2026-06-07 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*

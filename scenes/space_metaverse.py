@@ -24,6 +24,7 @@ import json
 import math
 import random
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 # ── parameters (mutate to evolve the scene) ──────────────────────────────────
@@ -31,7 +32,10 @@ PLANET = "earth"            # earth | moon | mars
 TERRAIN_SCALE = 50.0        # world units edge length
 TERRAIN_SUBDIV = 7          # 2^N subdivisions; 7 → 128×128
 SHOW_CLIMATE = True         # Copernicus-style overlay
-SHOW_MARKERS = True         # Galileo lat/lon markers
+SHOW_MARKERS = True         # Galileo lat/lon ground markers
+SHOW_GALILEO = True         # Galileo PRN constellation (24 satellites in orbit)
+SHOW_NIGHT = True           # translucent night-hemisphere overlay (UTC-driven)
+USE_REAL_SUN = True         # rotate sun azimuth by subsolar longitude (current UTC)
 
 # Per-planet visual + physical constants
 PLANETS = {
@@ -54,6 +58,24 @@ GEO_MARKERS = [
 ]
 
 STATE_PATH = str(Path.home() / ".space_metaverse_state.json")
+
+
+def _build_galileo_constellation() -> list:
+    """24 satellites in 3 planes × 8 slots. Approximate ground-track lat/lon
+    from inclination + mean anomaly + RAAN (right-ascension of ascending node).
+    Galileo: ~23,222 km altitude, 56° inclination, 14h orbital period."""
+    sats = []
+    for plane in range(3):
+        raan = plane * 120.0       # 3 planes spaced 120° apart
+        for slot in range(8):
+            mean_anom = slot * 45.0
+            lat = 56.0 * math.sin(math.radians(mean_anom))
+            lon = ((raan + mean_anom * 2.0 + 180.0) % 360.0) - 180.0
+            sats.append((f"E{plane + 1}-{slot + 1:02d}", lat, lon))
+    return sats
+
+
+GALILEO_PRNS = _build_galileo_constellation()
 
 
 # ── persistence ──────────────────────────────────────────────────────────────
@@ -83,6 +105,14 @@ def latlon_to_xy(lat_deg: float, lon_deg: float, scale: float) -> tuple:
     x = (lon_deg / 180.0) * (scale / 2.0)
     y = (lat_deg /  90.0) * (scale / 2.0)
     return (x, y)
+
+
+def subsolar_lon_utc() -> float:
+    """Approx subsolar longitude in degrees [-180, 180] for current UTC.
+    Simplified: assumes equation-of-time = 0; sufficient for visualisation."""
+    now = datetime.now(timezone.utc)
+    hour = now.hour + now.minute / 60.0 + now.second / 3600.0
+    return -15.0 * (hour - 12.0)
 
 
 # ── scene primitives ─────────────────────────────────────────────────────────
@@ -159,12 +189,42 @@ def add_climate_overlay(cfg: dict, scale: float) -> None:
     )
 
 
+def add_galileo_satellites(scale: float) -> None:
+    """Galileo PRN constellation — bright cyan emissive markers at Z=14 (orbit proxy)."""
+    mat = make_material("galileo_sat", (0.2, 0.85, 1.0, 1.0), emission=6.0)
+    for label, lat, lon in GALILEO_PRNS:
+        x, y = latlon_to_xy(lat, lon, scale)
+        bpy.ops.mesh.primitive_uv_sphere_add(
+            radius=0.35, location=(x, y, 14.0), segments=8, ring_count=6,
+        )
+        sat = bpy.context.object
+        sat.name = f"GAL_{label}"
+        sat.data.materials.append(mat)
+
+
+def add_night_overlay(scale: float) -> None:
+    """Translucent dark plane centred on antisolar longitude (180° from subsolar)."""
+    sub_lon = subsolar_lon_utc()
+    night_lon = ((sub_lon + 180.0 + 180.0) % 360.0) - 180.0
+    nx, _ = latlon_to_xy(0.0, night_lon, scale)
+    bpy.ops.mesh.primitive_plane_add(size=scale, location=(nx, 0, 7.0))
+    night = bpy.context.object
+    night.scale.x = 0.5  # cover one hemisphere width
+    night.name = "Night_Hemisphere"
+    night.data.materials.append(make_material("night_overlay", (0.02, 0.02, 0.07, 1.0), alpha=0.55))
+
+
 def add_lighting(cfg: dict) -> None:
     bpy.ops.object.light_add(type="SUN", location=(20, -20, 25))
     sun = bpy.context.object
     sun.name = "Sun"
     sun.data.energy = cfg["sun_energy"]
-    sun.rotation_euler = (math.radians(45), 0, math.radians(45))
+    if USE_REAL_SUN:
+        # Rotate sun azimuth around Z by subsolar longitude → matches current UTC
+        az = math.radians(subsolar_lon_utc())
+        sun.rotation_euler = (math.radians(45), 0, az)
+    else:
+        sun.rotation_euler = (math.radians(45), 0, math.radians(45))
 
 
 def add_camera() -> None:
@@ -198,6 +258,10 @@ def main() -> None:
         add_markers(TERRAIN_SCALE)
     if SHOW_CLIMATE:
         add_climate_overlay(cfg, TERRAIN_SCALE)
+    if SHOW_GALILEO and PLANET == "earth":
+        add_galileo_satellites(TERRAIN_SCALE)
+    if SHOW_NIGHT and PLANET == "earth":
+        add_night_overlay(TERRAIN_SCALE)
     add_lighting(cfg)
     add_camera()
     configure_render()
@@ -205,15 +269,18 @@ def main() -> None:
     state["sessions"] = state.get("sessions", 0) + 1
     state["last_planet"] = PLANET
     state["last_ts"] = time.time()
+    state["last_subsolar_lon"] = subsolar_lon_utc() if PLANET == "earth" else None
     state.setdefault("history", []).append(
-        {"ts": time.time(), "planet": PLANET, "markers": len(GEO_MARKERS)}
+        {"ts": time.time(), "planet": PLANET, "markers": len(GEO_MARKERS),
+         "galileo": len(GALILEO_PRNS) if (SHOW_GALILEO and PLANET == "earth") else 0}
     )
     # bound history length to avoid unbounded growth
     state["history"] = state["history"][-50:]
     save_state(state)
 
+    sats = len(GALILEO_PRNS) if (SHOW_GALILEO and PLANET == "earth") else 0
     print(f"[space_metaverse] planet={PLANET}  session={state['sessions']}  "
-          f"markers={len(GEO_MARKERS)}  terrain={2**TERRAIN_SUBDIV}x")
+          f"markers={len(GEO_MARKERS)}  galileo={sats}  terrain={2**TERRAIN_SUBDIV}x")
 
 
 main()
