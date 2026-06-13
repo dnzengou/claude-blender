@@ -27,9 +27,11 @@ python blender_gen.py "neon city" --dry-run --auto-model                 # plan 
 python blender_gen.py "forest" --cost --verbose                          # show spend
 python blender_gen.py --batch p.txt --cost-budget 0.25                   # halt on budget
 python blender_gen.py "donut" --explain                                  # add rationale
+python blender_gen.py --exec scenes/space_metaverse.py --preview         # run file as-is
+python blender_gen.py "arcade" --theme themes_example.json --preset vaporwave  # custom theme
 ```
 
-## Flags (v0.10)
+## Flags (v0.12)
 | Flag | Effect |
 |------|--------|
 | `--send` | Execute script in running Blender via MCP socket |
@@ -53,6 +55,8 @@ python blender_gen.py "donut" --explain                                  # add r
 | `--dry-run` | Skip the API call; print resolved model + prompt preview only |
 | `--cost-budget USD` | Halt batch once cumulative cost exceeds USD threshold (requires `--batch`) |
 | `--explain` | Prepend a `# Design rationale:` comment block to the generated script |
+| `--exec FILE` | Send a `.py` file to Blender as-is (no Claude call); auto-enables `--send` |
+| `--theme FILE` | Load JSON `{name: tokens}`; merged into `PRESETS` so `--preset NAME` can pick the new style |
 
 ## Files
 - `blender_gen.py` — main CLI, entry point
@@ -60,7 +64,8 @@ python blender_gen.py "donut" --explain                                  # add r
 - `.gitignore` — excludes .env, caches, venvs
 - `.github/workflows/ci.yml` — ruff lint + py_compile on push
 - `scenes/cyberpunk_city.py` — reference scene: cyberpunk city grid
-- `scenes/space_metaverse.py` — reference scene: geospatial persistent 3D world (Earth/Moon/Mars, Galileo markers, Copernicus climate overlay)
+- `scenes/space_metaverse.py` — reference scene: geospatial persistent 3D world (Earth/Moon/Mars, Galileo markers + orbits, Copernicus climate overlay)
+- `themes_example.json` — sample `--theme` styles (vaporwave/noir/solarpunk)
 
 ## Conventions
 - No native C extensions; stays ARM-compatible

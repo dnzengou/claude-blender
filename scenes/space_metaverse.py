@@ -34,6 +34,7 @@ TERRAIN_SUBDIV = 7          # 2^N subdivisions; 7 → 128×128
 SHOW_CLIMATE = True         # Copernicus-style overlay
 SHOW_MARKERS = True         # Galileo lat/lon ground markers
 SHOW_GALILEO = True         # Galileo PRN constellation (24 satellites in orbit)
+SHOW_ORBITS = True          # Galileo orbit-path traces (one curve per plane)
 SHOW_NIGHT = True           # translucent night-hemisphere overlay (UTC-driven)
 USE_REAL_SUN = True         # rotate sun azimuth by subsolar longitude (current UTC)
 
@@ -202,6 +203,42 @@ def add_galileo_satellites(scale: float) -> None:
         sat.data.materials.append(mat)
 
 
+def add_galileo_orbits(scale: float) -> None:
+    """One POLY curve per Galileo orbital plane, sampled at 60 mean-anomaly steps.
+    Split into segments at longitude wrap (|Δlon| > 180°) so the curve doesn't
+    cross the equirectangular map. Cyan emissive, bevelled for visibility."""
+    mat = make_material("galileo_orbit", (0.1, 0.55, 0.95, 1.0), emission=2.0)
+    samples = 60
+    for plane in range(3):
+        raan = plane * 120.0
+        segments: list = [[]]
+        prev_lon = None
+        for i in range(samples + 1):  # +1 to close the loop
+            mean_anom = (i / samples) * 360.0
+            lat = 56.0 * math.sin(math.radians(mean_anom))
+            lon = ((raan + mean_anom * 2.0 + 180.0) % 360.0) - 180.0
+            if prev_lon is not None and abs(lon - prev_lon) > 180.0:
+                segments.append([])  # wrap detected → new spline
+            x, y = latlon_to_xy(lat, lon, scale)
+            segments[-1].append((x, y, 13.5))
+            prev_lon = lon
+
+        curve = bpy.data.curves.new(f"GalOrbit_P{plane + 1}", type="CURVE")
+        curve.dimensions = "3D"
+        curve.bevel_depth = 0.07
+        curve.bevel_resolution = 2
+        for seg in segments:
+            if len(seg) < 2:
+                continue
+            spline = curve.splines.new("POLY")
+            spline.points.add(len(seg) - 1)  # POLY spline starts with 1 point
+            for j, (x, y, z) in enumerate(seg):
+                spline.points[j].co = (x, y, z, 1.0)
+        obj = bpy.data.objects.new(f"GalOrbit_P{plane + 1}", curve)
+        bpy.context.collection.objects.link(obj)
+        obj.data.materials.append(mat)
+
+
 def add_night_overlay(scale: float) -> None:
     """Translucent dark plane centred on antisolar longitude (180° from subsolar)."""
     sub_lon = subsolar_lon_utc()
@@ -260,6 +297,8 @@ def main() -> None:
         add_climate_overlay(cfg, TERRAIN_SCALE)
     if SHOW_GALILEO and PLANET == "earth":
         add_galileo_satellites(TERRAIN_SCALE)
+    if SHOW_ORBITS and PLANET == "earth":
+        add_galileo_orbits(TERRAIN_SCALE)
     if SHOW_NIGHT and PLANET == "earth":
         add_night_overlay(TERRAIN_SCALE)
     add_lighting(cfg)
@@ -279,8 +318,10 @@ def main() -> None:
     save_state(state)
 
     sats = len(GALILEO_PRNS) if (SHOW_GALILEO and PLANET == "earth") else 0
+    orbits = 3 if (SHOW_ORBITS and PLANET == "earth") else 0
     print(f"[space_metaverse] planet={PLANET}  session={state['sessions']}  "
-          f"markers={len(GEO_MARKERS)}  galileo={sats}  terrain={2**TERRAIN_SUBDIV}x")
+          f"markers={len(GEO_MARKERS)}  galileo={sats}  orbits={orbits}  "
+          f"terrain={2**TERRAIN_SUBDIV}x")
 
 
 main()

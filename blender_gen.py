@@ -20,6 +20,8 @@ Usage:
     python blender_gen.py "forest" --cost --verbose                  # show spend
     python blender_gen.py --batch p.txt --cost-budget 0.25            # halt on budget
     python blender_gen.py "donut" --explain                          # add rationale
+    python blender_gen.py --exec scenes/space_metaverse.py --preview  # run + render
+    python blender_gen.py "cityscape" --theme themes.json --preset vaporwave
 """
 
 import anthropic
@@ -51,7 +53,7 @@ Rules:
 SYSTEM_BLOCK = [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}]
 
 # Style presets — prepended to the user prompt before Claude sees it.
-# Keys must stay lowercase (CLI choices are lowercase).
+# Keys are lowercase. Extensible at runtime via --theme FILE.
 PRESETS: dict[str, str] = {
     "cyberpunk": "Style: neon-lit cyberpunk aesthetic — glowing emissive materials in cyan/magenta/yellow, dark metallic surfaces, wet reflective ground, volumetric fog. ",
     "nature":    "Style: organic low-poly nature scene — earth tones, subsurface scattering on foliage, soft diffuse lighting, no sharp edges. ",
@@ -339,6 +341,21 @@ def read_batch_prompts(path: str) -> list[str]:
     return [ln.strip() for ln in lines if ln.strip() and not ln.startswith("#")]
 
 
+def load_theme_file(path: str) -> dict:
+    """Load a JSON file of {style_name: tokens} and lowercase the keys.
+    Exits with a clear error on bad JSON or wrong shape (boundary input, not internal)."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"Error: cannot load --theme {path}: {exc}", file=sys.stderr)
+        sys.exit(1)
+    if not isinstance(data, dict):
+        print(f"Error: --theme file must be a JSON object, got {type(data).__name__}.", file=sys.stderr)
+        sys.exit(1)
+    return {str(k).lower(): str(v) for k, v in data.items()}
+
+
 # ── iterate helper ────────────────────────────────────────────────────────────
 
 def _execute_with_iterate(script: str, args, label: str = "") -> str:
@@ -494,6 +511,34 @@ def run_batch(prompts: list[str], args) -> None:
                 _render_preview(args.host, args.port)
 
 
+# ── exec pipeline ─────────────────────────────────────────────────────────────
+
+def run_exec(path: str, args) -> None:
+    """Send a .py file to Blender as-is (no Claude call). Composable with --diff/--preview/--iterate."""
+    p = Path(path)
+    if not p.exists():
+        print(f"Error: --exec file not found: {path}", file=sys.stderr)
+        sys.exit(1)
+
+    script = p.read_text(encoding="utf-8")
+    print(f"Loaded {path} ({len(script)} chars).", file=sys.stderr)
+
+    scene_before = _snapshot(args.host, args.port) if args.diff else None
+
+    if args.iterate:
+        script = _execute_with_iterate(script, args)
+    else:
+        _send(script, args.host, args.port)
+
+    if scene_before is not None:
+        scene_after = _snapshot(args.host, args.port)
+        if scene_after is not None:
+            _print_scene_diff(scene_before, scene_after)
+
+    if args.preview:
+        _render_preview(args.host, args.port)
+
+
 # ── watch pipeline ────────────────────────────────────────────────────────────
 
 def run_watch(path: str, args) -> None:
@@ -566,6 +611,8 @@ def main():
     input_group.add_argument("prompt", nargs="?", help="What to build in Blender")
     input_group.add_argument("--batch", metavar="FILE", help="File of prompts (one per line)")
     input_group.add_argument("--watch", metavar="FILE", help="Prompt text file to watch; regenerate on each save")
+    input_group.add_argument("--exec", dest="exec_path", metavar="FILE",
+                              help="Execute a .py file in Blender as-is (no Claude call); requires running BlenderMCP")
 
     parser.add_argument(
         "--model",
@@ -588,8 +635,12 @@ def main():
     parser.add_argument("--diff", action="store_true", help="Show scene object diff before/after execution (requires --send)")
     parser.add_argument("--preview", action="store_true", help="Render a 480x270 preview after execution and open it (requires --send)")
     parser.add_argument(
-        "--preset", choices=list(PRESETS), metavar="STYLE",
-        help=f"Style preset prepended to prompt ({', '.join(PRESETS)})",
+        "--preset", metavar="STYLE",
+        help=f"Style preset prepended to prompt (built-in: {', '.join(PRESETS)}; extend via --theme)",
+    )
+    parser.add_argument(
+        "--theme", metavar="FILE",
+        help="JSON file {name: tokens} merged into PRESETS at startup; use with --preset NAME",
     )
     parser.add_argument(
         "--history", metavar="FILE",
@@ -618,6 +669,9 @@ def main():
 
     args = parser.parse_args()
 
+    if args.exec_path:
+        args.send = True  # --exec is meaningless without sending; must precede --send guards
+
     if args.iterate and not args.send:
         parser.error("--iterate requires --send")
     if args.diff and not args.send:
@@ -627,7 +681,14 @@ def main():
     if args.cost_budget is not None and not args.batch:
         parser.error("--cost-budget requires --batch")
 
-    if args.watch:
+    if args.theme:
+        PRESETS.update(load_theme_file(args.theme))
+    if args.preset and args.preset not in PRESETS:
+        parser.error(f"--preset {args.preset!r} not in available styles: {', '.join(PRESETS)}")
+
+    if args.exec_path:
+        run_exec(args.exec_path, args)
+    elif args.watch:
         run_watch(args.watch, args)
     elif args.batch:
         prompts = read_batch_prompts(args.batch)
