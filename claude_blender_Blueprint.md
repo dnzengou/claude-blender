@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.12.0 · 2026-06-09 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.13.0 · 2026-06-10 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -117,10 +117,15 @@ Input modes
 - [x] `themes_example.json`: 3 demo styles (`vaporwave`, `noir`, `solarpunk`)
 - [x] `scenes/space_metaverse.py` — `add_galileo_orbits()`: one POLY curve per orbital plane, 60-sample mean-anomaly sweep, **wrap-aware** (splits curve at lon=±180° boundary so the trace doesn't cross the equirectangular map); bevelled cyan emissive; `SHOW_ORBITS` flag, Earth-only gate
 
-### v0.13 — Next 🔲
-- [ ] `--save-state FILE`: persist `args` namespace + last prompt to a `.jsonl` rerun log
-- [ ] `scenes/space_metaverse.py` extension: rotating GIF export (single command renders animation of one Galileo orbit)
-- [ ] `--theme-url URL`: download a JSON theme over HTTPS (stdlib `urllib`), cache locally
+### v0.13 — Shipped ✅ (dual-niche)
+- [x] `--save-state FILE`: append JSONL record of each CLI invocation (mode, target, non-default args); replay-ready; cache-safe (no API impact)
+- [x] `scenes/space_metaverse.py` — `ANIMATE` mode: `keyframe_sun_rotation()` (linear-interp keyframes, seamless loop) + `render_animation()` (PNG sequence to `~/space_metaverse_frames/`); single Galileo-orbit period; optional `ffmpeg -i frame_%04d.png out.mp4` post-processing
+- [x] No GIF dependency (Pillow/imageio): bpy-native PNG sequence keeps the pure-stdlib + bpy-only invariant intact
+
+### v0.14 — Next 🔲
+- [ ] `--theme-url URL`: download a JSON theme over HTTPS (stdlib `urllib`), cache to `~/.blender_gen_themes/`
+- [ ] `--retry N`: distinct from `--iterate` — retry the API call itself on transient network errors with exponential backoff
+- [ ] `scenes/space_metaverse.py` extension: lat/lon city skyline blocks (cubes) at GEO_MARKERS for cityscape feel
 
 ---
 
@@ -164,6 +169,7 @@ add_flag(NAME, EFFECT):
 | v0.10 | `--cost-budget` + `--explain` + space_metaverse Galileo/night extensions (**dual niche**) | EvoMetaClaw simultaneous content+CLI evolution — recipe absorbs both axes in one epoch |
 | v0.11 | `--exec FILE` (CLI flag, exec niche) | User asked to "execute space metaverse" → run_exec pipeline gap exposed; mutual-exclusive input mode added |
 | v0.12 | `--theme FILE` + Galileo orbit curves (**dual niche**) | EvoMetaClaw paired evolution: extend PRESETS surface area (CLI) + complete Galileo viz (content); wrap-aware curve algorithm new in toolkit |
+| v0.13 | `--save-state FILE` + space_metaverse ANIMATE (**dual niche**) | Recurring dual-niche pattern; replay log addresses reproducibility gap; PNG sequence avoids GIF native dep (ARM-safe) |
 
 ---
 
@@ -177,6 +183,20 @@ add_flag(NAME, EFFECT):
 ---
 
 ## Changelog
+
+### v0.13.0 — 2026-06-10
+- `--save-state FILE`:
+  - `_save_state()` helper next to `_log_history`; same OSError-tolerant append-mode pattern
+  - Records `{ts, mode, target, args}` where `args` is `vars(args)` filtered of None/False/0/"" + `save_state` key itself
+  - Mode ∈ `{single, batch, exec, watch}`; target is the prompt / batch file / exec file / watch file
+  - Fires once per `main()` invocation after the dispatched run completes
+  - Self-tested: dry-run + auto-model + save-state → record contains `mode=single, target='spinning torus', args=['auto_model','dry_run','host','model','port','prompt']`
+- `scenes/space_metaverse.py` → `ANIMATE` mode:
+  - `keyframe_sun_rotation()`: keyframes Z-rotation at frame 1 and frame ANIM_FRAMES+1 → seamless loop; switches all keyframe interpolation to LINEAR for steady spin
+  - `render_animation()`: iterates `[frame_start, frame_end]`, writes `frame_NNNN.png` to `~/space_metaverse_frames/`
+  - `ANIMATE`, `ANIM_FRAMES=60`, `ANIM_DIR` flags at module top; OFF by default to keep cold-run cheap
+  - Optional post-step: `ffmpeg -i ~/space_metaverse_frames/frame_%04d.png out.mp4` (external; bpy itself doesn't ship video encoder on all platforms)
+- v0.14 roadmap: `--theme-url URL`, `--retry N`, space_metaverse city skyline blocks
 
 ### v0.12.0 — 2026-06-09
 - `--theme FILE`:
@@ -279,4 +299,4 @@ add_flag(NAME, EFFECT):
 
 ---
 
-*claude-blender Blueprint v0.12.0 · 2026-06-09 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.13.0 · 2026-06-10 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*

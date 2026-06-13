@@ -37,6 +37,9 @@ SHOW_GALILEO = True         # Galileo PRN constellation (24 satellites in orbit)
 SHOW_ORBITS = True          # Galileo orbit-path traces (one curve per plane)
 SHOW_NIGHT = True           # translucent night-hemisphere overlay (UTC-driven)
 USE_REAL_SUN = True         # rotate sun azimuth by subsolar longitude (current UTC)
+ANIMATE = False             # if True: render a PNG sequence of one full sun rotation
+ANIM_FRAMES = 60            # one full rotation over ANIM_FRAMES frames
+ANIM_DIR = str(Path.home() / "space_metaverse_frames")
 
 # Per-planet visual + physical constants
 PLANETS = {
@@ -280,6 +283,40 @@ def configure_render() -> None:
     scene.render.engine = "BLENDER_EEVEE_NEXT" if "BLENDER_EEVEE_NEXT" in available else "BLENDER_EEVEE"
 
 
+def keyframe_sun_rotation() -> None:
+    """Keyframe sun Z-rotation over [1, ANIM_FRAMES] — one full revolution."""
+    sun = bpy.data.objects.get("Sun")
+    if not sun:
+        return
+    scene = bpy.context.scene
+    scene.frame_start = 1
+    scene.frame_end = ANIM_FRAMES
+    elev_x = math.radians(45)
+    for f in (1, ANIM_FRAMES + 1):  # start + (end+1) so loop is seamless
+        scene.frame_set(f)
+        sun.rotation_euler = (elev_x, 0, ((f - 1) / ANIM_FRAMES) * 2 * math.pi)
+        sun.keyframe_insert(data_path="rotation_euler", index=2)
+    # linear interpolation across the loop
+    if sun.animation_data and sun.animation_data.action:
+        for fc in sun.animation_data.action.fcurves:
+            for kp in fc.keyframe_points:
+                kp.interpolation = "LINEAR"
+    scene.frame_set(1)
+
+
+def render_animation() -> None:
+    """Write ANIM_FRAMES PNGs to ANIM_DIR; one file per frame."""
+    out = Path(ANIM_DIR)
+    out.mkdir(parents=True, exist_ok=True)
+    scene = bpy.context.scene
+    scene.render.image_settings.file_format = "PNG"
+    for f in range(scene.frame_start, scene.frame_end + 1):
+        scene.frame_set(f)
+        scene.render.filepath = str(out / f"frame_{f:04d}.png")
+        bpy.ops.render.render(write_still=True)
+    print(f"[space_metaverse] rendered {ANIM_FRAMES} frames → {out}")
+
+
 # ── main ─────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -304,6 +341,10 @@ def main() -> None:
     add_lighting(cfg)
     add_camera()
     configure_render()
+
+    if ANIMATE:
+        keyframe_sun_rotation()
+        render_animation()
 
     state["sessions"] = state.get("sessions", 0) + 1
     state["last_planet"] = PLANET

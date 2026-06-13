@@ -22,6 +22,7 @@ Usage:
     python blender_gen.py "donut" --explain                          # add rationale
     python blender_gen.py --exec scenes/space_metaverse.py --preview  # run + render
     python blender_gen.py "cityscape" --theme themes.json --preset vaporwave
+    python blender_gen.py "robot" --save-state runs.jsonl              # replay log
 """
 
 import anthropic
@@ -236,6 +237,24 @@ def _log_history(path: str, model: str, prompt: str, script: str) -> None:
             f.write(json.dumps(record) + "\n")
     except OSError as exc:
         print(f"Warning: history write failed ({exc}).", file=sys.stderr)
+
+
+def _save_state(path: str, args, mode: str, target: str) -> None:
+    """Append a JSONL record of this CLI invocation for replay.
+    Strips falsy/default values to keep the log compact."""
+    args_dict = {k: v for k, v in vars(args).items()
+                 if v not in (None, False, 0, "") and k != "save_state"}
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "mode": mode,
+        "target": target,
+        "args": args_dict,
+    }
+    try:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, default=str) + "\n")
+    except OSError as exc:
+        print(f"Warning: save-state write failed ({exc}).", file=sys.stderr)
 
 
 # ── verbose / usage helper ────────────────────────────────────────────────────
@@ -643,6 +662,10 @@ def main():
         help="JSON file {name: tokens} merged into PRESETS at startup; use with --preset NAME",
     )
     parser.add_argument(
+        "--save-state", metavar="FILE",
+        help="Append a JSONL replay record (mode, target, args) after this invocation",
+    )
+    parser.add_argument(
         "--history", metavar="FILE",
         help="Append JSONL {ts, model, prompt, script} record after each generation",
     )
@@ -688,16 +711,23 @@ def main():
 
     if args.exec_path:
         run_exec(args.exec_path, args)
+        mode, target = "exec", args.exec_path
     elif args.watch:
         run_watch(args.watch, args)
+        mode, target = "watch", args.watch
     elif args.batch:
         prompts = read_batch_prompts(args.batch)
         if not prompts:
             print("Error: batch file is empty.", file=sys.stderr)
             sys.exit(1)
         run_batch(prompts, args)
+        mode, target = "batch", args.batch
     else:
         run_single(args.prompt, args)
+        mode, target = "single", args.prompt
+
+    if args.save_state:
+        _save_state(args.save_state, args, mode, target)
 
 
 if __name__ == "__main__":
