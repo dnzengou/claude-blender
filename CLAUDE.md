@@ -27,9 +27,10 @@ python blender_gen.py "neon city" --dry-run --auto-model                 # plan 
 python blender_gen.py "forest" --cost --verbose                          # show spend
 python blender_gen.py --batch p.txt --cost-budget 0.25                   # halt on budget
 python blender_gen.py "donut" --explain                                  # add rationale
+python blender_gen.py --exec scenes/space_metaverse.py --preview         # run file as-is
 ```
 
-## Flags (v0.10)
+## Flags (v0.11)
 | Flag | Effect |
 |------|--------|
 | `--send` | Execute script in running Blender via MCP socket |
@@ -53,6 +54,7 @@ python blender_gen.py "donut" --explain                                  # add r
 | `--dry-run` | Skip the API call; print resolved model + prompt preview only |
 | `--cost-budget USD` | Halt batch once cumulative cost exceeds USD threshold (requires `--batch`) |
 | `--explain` | Prepend a `# Design rationale:` comment block to the generated script |
+| `--exec FILE` | Send a `.py` file to Blender as-is (no Claude call); auto-enables `--send` |
 
 ## Files
 - `blender_gen.py` — main CLI, entry point

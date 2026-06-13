@@ -20,6 +20,7 @@ Usage:
     python blender_gen.py "forest" --cost --verbose                  # show spend
     python blender_gen.py --batch p.txt --cost-budget 0.25            # halt on budget
     python blender_gen.py "donut" --explain                          # add rationale
+    python blender_gen.py --exec scenes/space_metaverse.py --preview  # run + render
 """
 
 import anthropic
@@ -494,6 +495,34 @@ def run_batch(prompts: list[str], args) -> None:
                 _render_preview(args.host, args.port)
 
 
+# ── exec pipeline ─────────────────────────────────────────────────────────────
+
+def run_exec(path: str, args) -> None:
+    """Send a .py file to Blender as-is (no Claude call). Composable with --diff/--preview/--iterate."""
+    p = Path(path)
+    if not p.exists():
+        print(f"Error: --exec file not found: {path}", file=sys.stderr)
+        sys.exit(1)
+
+    script = p.read_text(encoding="utf-8")
+    print(f"Loaded {path} ({len(script)} chars).", file=sys.stderr)
+
+    scene_before = _snapshot(args.host, args.port) if args.diff else None
+
+    if args.iterate:
+        script = _execute_with_iterate(script, args)
+    else:
+        _send(script, args.host, args.port)
+
+    if scene_before is not None:
+        scene_after = _snapshot(args.host, args.port)
+        if scene_after is not None:
+            _print_scene_diff(scene_before, scene_after)
+
+    if args.preview:
+        _render_preview(args.host, args.port)
+
+
 # ── watch pipeline ────────────────────────────────────────────────────────────
 
 def run_watch(path: str, args) -> None:
@@ -566,6 +595,8 @@ def main():
     input_group.add_argument("prompt", nargs="?", help="What to build in Blender")
     input_group.add_argument("--batch", metavar="FILE", help="File of prompts (one per line)")
     input_group.add_argument("--watch", metavar="FILE", help="Prompt text file to watch; regenerate on each save")
+    input_group.add_argument("--exec", dest="exec_path", metavar="FILE",
+                              help="Execute a .py file in Blender as-is (no Claude call); requires running BlenderMCP")
 
     parser.add_argument(
         "--model",
@@ -618,6 +649,9 @@ def main():
 
     args = parser.parse_args()
 
+    if args.exec_path:
+        args.send = True  # --exec is meaningless without sending; must precede --send guards
+
     if args.iterate and not args.send:
         parser.error("--iterate requires --send")
     if args.diff and not args.send:
@@ -627,7 +661,9 @@ def main():
     if args.cost_budget is not None and not args.batch:
         parser.error("--cost-budget requires --batch")
 
-    if args.watch:
+    if args.exec_path:
+        run_exec(args.exec_path, args)
+    elif args.watch:
         run_watch(args.watch, args)
     elif args.batch:
         prompts = read_batch_prompts(args.batch)

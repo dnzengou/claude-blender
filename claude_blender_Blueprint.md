@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.10.0 · 2026-06-07 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.11.0 · 2026-06-08 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -107,7 +107,11 @@ Input modes
 - [x] `--cost-budget USD`: tracks cumulative spend via `cost_sink` list passed into `generate_blender_script`; halts batch on first call exceeding threshold (atomic per call, not per token); requires `--batch`
 - [x] `--explain`: appends `EXPLAIN_SUFFIX` to user prompt asking Claude to prepend a `# Design rationale:` comment block; cache-safe (only user prompt mutated, SYSTEM_BLOCK untouched)
 
-### v0.11 — Next 🔲
+### v0.11 — Shipped ✅
+- [x] `--exec FILE`: run an existing `.py` bpy script in Blender as-is (no Claude call); composable with `--diff` / `--preview` / `--iterate`; mutually exclusive with `prompt` / `--batch` / `--watch`; auto-enables `--send`
+- [x] Run path verified end-to-end against `scenes/space_metaverse.py` (load → MCP send attempted → graceful "MCP unreachable" path)
+
+### v0.12 — Next 🔲
 - [ ] `--theme FILE`: load a user-defined style preset from JSON/YAML (extends `PRESETS` at runtime)
 - [ ] `scenes/space_metaverse.py` extension: orbit-path traces for Galileo PRNs (curve objects)
 - [ ] `--save-state FILE`: persist `args` namespace + last prompt to a `.jsonl` rerun log
@@ -152,6 +156,7 @@ add_flag(NAME, EFFECT):
 | v0.8 | `scenes/space_metaverse.py` (**niche jump**: CLI flag → content asset) | EvoMetaClaw signal from external script: bridge geospatial + persistent + 3D world |
 | v0.9 | `--cost` + `--dry-run` (**niche return**: CLI flag) | EvoMetaClaw paired-flag complement to `--auto-model` (preview routing + spend before commit) |
 | v0.10 | `--cost-budget` + `--explain` + space_metaverse Galileo/night extensions (**dual niche**) | EvoMetaClaw simultaneous content+CLI evolution — recipe absorbs both axes in one epoch |
+| v0.11 | `--exec FILE` (CLI flag, exec niche) | User asked to "execute space metaverse" → run_exec pipeline gap exposed; mutual-exclusive input mode added |
 
 ---
 
@@ -165,6 +170,12 @@ add_flag(NAME, EFFECT):
 ---
 
 ## Changelog
+
+### v0.11.0 — 2026-06-08
+- `--exec FILE`: new mutually-exclusive input mode (alongside `prompt` / `--batch` / `--watch`) that reads a `.py` file from disk and sends it directly to Blender via MCP; **no Claude API call** → zero token cost
+- `run_exec()` pipeline: load file → optional `--diff` snapshot → `_send` or `_execute_with_iterate` → diff print → `--preview` render; auto-sets `args.send = True` *before* `--send` guards run (guard-order bug caught + fixed during execution test)
+- Verified end-to-end with `scenes/space_metaverse.py` (10 882 chars loaded; MCP socket attempt; graceful "unreachable" message)
+- v0.12 roadmap unchanged from prior v0.11 (`--theme FILE`, orbit-path traces, `--save-state FILE`)
 
 ### v0.10.0 — 2026-06-07
 - `scenes/space_metaverse.py`:
@@ -247,4 +258,4 @@ add_flag(NAME, EFFECT):
 
 ---
 
-*claude-blender Blueprint v0.10.0 · 2026-06-07 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.11.0 · 2026-06-08 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
