@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.11.0 · 2026-06-08 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.12.0 · 2026-06-09 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -45,6 +45,7 @@ Input modes
 | `claude_blender_Blueprint.md` | this file |
 | `claude-blender-prompts.txt` | reference prompts & links |
 | `example_batch.txt` | sample batch prompts file (5 scenes) |
+| `themes_example.json` | 3 example `--theme` styles (vaporwave/noir/solarpunk) |
 | `prompts/mcp_prompts.md` | Claude Desktop × BlenderMCP prompt library (6 examples) |
 | `scenes/cyberpunk_city.py` | reference bpy scene: cyberpunk city grid |
 | `scenes/space_metaverse.py` | reference bpy scene: geospatial persistent 3D world (Earth/Moon/Mars) |
@@ -111,10 +112,15 @@ Input modes
 - [x] `--exec FILE`: run an existing `.py` bpy script in Blender as-is (no Claude call); composable with `--diff` / `--preview` / `--iterate`; mutually exclusive with `prompt` / `--batch` / `--watch`; auto-enables `--send`
 - [x] Run path verified end-to-end against `scenes/space_metaverse.py` (load → MCP send attempted → graceful "MCP unreachable" path)
 
-### v0.12 — Next 🔲
-- [ ] `--theme FILE`: load a user-defined style preset from JSON/YAML (extends `PRESETS` at runtime)
-- [ ] `scenes/space_metaverse.py` extension: orbit-path traces for Galileo PRNs (curve objects)
+### v0.12 — Shipped ✅ (dual-niche: CLI + content)
+- [x] `--theme FILE`: load `{name: tokens}` JSON map; merged into `PRESETS` at startup; `--preset` accepts built-in + theme keys; manual validation replaces argparse `choices` constraint
+- [x] `themes_example.json`: 3 demo styles (`vaporwave`, `noir`, `solarpunk`)
+- [x] `scenes/space_metaverse.py` — `add_galileo_orbits()`: one POLY curve per orbital plane, 60-sample mean-anomaly sweep, **wrap-aware** (splits curve at lon=±180° boundary so the trace doesn't cross the equirectangular map); bevelled cyan emissive; `SHOW_ORBITS` flag, Earth-only gate
+
+### v0.13 — Next 🔲
 - [ ] `--save-state FILE`: persist `args` namespace + last prompt to a `.jsonl` rerun log
+- [ ] `scenes/space_metaverse.py` extension: rotating GIF export (single command renders animation of one Galileo orbit)
+- [ ] `--theme-url URL`: download a JSON theme over HTTPS (stdlib `urllib`), cache locally
 
 ---
 
@@ -157,6 +163,7 @@ add_flag(NAME, EFFECT):
 | v0.9 | `--cost` + `--dry-run` (**niche return**: CLI flag) | EvoMetaClaw paired-flag complement to `--auto-model` (preview routing + spend before commit) |
 | v0.10 | `--cost-budget` + `--explain` + space_metaverse Galileo/night extensions (**dual niche**) | EvoMetaClaw simultaneous content+CLI evolution — recipe absorbs both axes in one epoch |
 | v0.11 | `--exec FILE` (CLI flag, exec niche) | User asked to "execute space metaverse" → run_exec pipeline gap exposed; mutual-exclusive input mode added |
+| v0.12 | `--theme FILE` + Galileo orbit curves (**dual niche**) | EvoMetaClaw paired evolution: extend PRESETS surface area (CLI) + complete Galileo viz (content); wrap-aware curve algorithm new in toolkit |
 
 ---
 
@@ -170,6 +177,20 @@ add_flag(NAME, EFFECT):
 ---
 
 ## Changelog
+
+### v0.12.0 — 2026-06-09
+- `--theme FILE`:
+  - `load_theme_file()`: reads JSON object `{name: tokens_string}`, lowercases keys, exits with clear stderr message on bad JSON / wrong shape
+  - `PRESETS.update()` at startup (after `parse_args`, before dispatch); cache-safe because system prompt is never mutated
+  - `--preset` loses argparse `choices` constraint; manual validation against (built-in ∪ theme keys) with clear error listing all available names
+  - `themes_example.json` shipped with 3 demos: `vaporwave`, `noir`, `solarpunk`
+  - Self-tested: `--preset vaporwave` prepends correct token; `--preset nonexistent` rejected with full available-styles listing
+- `scenes/space_metaverse.py` → `add_galileo_orbits()`:
+  - 60-sample mean-anomaly sweep per plane, analytic ground-track via same formula as `_build_galileo_constellation`
+  - **Wrap-aware**: detects |Δlon| > 180° between consecutive samples and starts a new POLY spline → curve never draws a wrong line across the wrap boundary
+  - Bevelled (depth 0.07, resolution 2) cyan emissive; one curve object per plane → 3 objects total
+  - `SHOW_ORBITS` flag, Earth-only (Moon/Mars unaffected)
+- v0.13 roadmap: `--save-state FILE`, animation export, `--theme-url URL`
 
 ### v0.11.0 — 2026-06-08
 - `--exec FILE`: new mutually-exclusive input mode (alongside `prompt` / `--batch` / `--watch`) that reads a `.py` file from disk and sends it directly to Blender via MCP; **no Claude API call** → zero token cost
@@ -258,4 +279,4 @@ add_flag(NAME, EFFECT):
 
 ---
 
-*claude-blender Blueprint v0.11.0 · 2026-06-08 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.12.0 · 2026-06-09 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
