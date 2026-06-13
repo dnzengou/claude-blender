@@ -21,6 +21,7 @@ Usage:
     python blender_gen.py --batch p.txt --cost-budget 0.25            # halt on budget
     python blender_gen.py "donut" --explain                          # add rationale
     python blender_gen.py --exec scenes/space_metaverse.py --preview  # run + render
+    python blender_gen.py "cityscape" --theme themes.json --preset vaporwave
 """
 
 import anthropic
@@ -52,7 +53,7 @@ Rules:
 SYSTEM_BLOCK = [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}]
 
 # Style presets — prepended to the user prompt before Claude sees it.
-# Keys must stay lowercase (CLI choices are lowercase).
+# Keys are lowercase. Extensible at runtime via --theme FILE.
 PRESETS: dict[str, str] = {
     "cyberpunk": "Style: neon-lit cyberpunk aesthetic — glowing emissive materials in cyan/magenta/yellow, dark metallic surfaces, wet reflective ground, volumetric fog. ",
     "nature":    "Style: organic low-poly nature scene — earth tones, subsurface scattering on foliage, soft diffuse lighting, no sharp edges. ",
@@ -340,6 +341,21 @@ def read_batch_prompts(path: str) -> list[str]:
     return [ln.strip() for ln in lines if ln.strip() and not ln.startswith("#")]
 
 
+def load_theme_file(path: str) -> dict:
+    """Load a JSON file of {style_name: tokens} and lowercase the keys.
+    Exits with a clear error on bad JSON or wrong shape (boundary input, not internal)."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"Error: cannot load --theme {path}: {exc}", file=sys.stderr)
+        sys.exit(1)
+    if not isinstance(data, dict):
+        print(f"Error: --theme file must be a JSON object, got {type(data).__name__}.", file=sys.stderr)
+        sys.exit(1)
+    return {str(k).lower(): str(v) for k, v in data.items()}
+
+
 # ── iterate helper ────────────────────────────────────────────────────────────
 
 def _execute_with_iterate(script: str, args, label: str = "") -> str:
@@ -619,8 +635,12 @@ def main():
     parser.add_argument("--diff", action="store_true", help="Show scene object diff before/after execution (requires --send)")
     parser.add_argument("--preview", action="store_true", help="Render a 480x270 preview after execution and open it (requires --send)")
     parser.add_argument(
-        "--preset", choices=list(PRESETS), metavar="STYLE",
-        help=f"Style preset prepended to prompt ({', '.join(PRESETS)})",
+        "--preset", metavar="STYLE",
+        help=f"Style preset prepended to prompt (built-in: {', '.join(PRESETS)}; extend via --theme)",
+    )
+    parser.add_argument(
+        "--theme", metavar="FILE",
+        help="JSON file {name: tokens} merged into PRESETS at startup; use with --preset NAME",
     )
     parser.add_argument(
         "--history", metavar="FILE",
@@ -660,6 +680,11 @@ def main():
         parser.error("--preview requires --send")
     if args.cost_budget is not None and not args.batch:
         parser.error("--cost-budget requires --batch")
+
+    if args.theme:
+        PRESETS.update(load_theme_file(args.theme))
+    if args.preset and args.preset not in PRESETS:
+        parser.error(f"--preset {args.preset!r} not in available styles: {', '.join(PRESETS)}")
 
     if args.exec_path:
         run_exec(args.exec_path, args)
