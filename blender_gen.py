@@ -23,10 +23,12 @@ Usage:
     python blender_gen.py --exec scenes/space_metaverse.py --preview  # run + render
     python blender_gen.py "cityscape" --theme themes.json --preset vaporwave
     python blender_gen.py "robot" --save-state runs.jsonl              # replay log
+    python blender_gen.py "city" --theme-url https://example.com/themes.json --preset noir
 """
 
 import anthropic
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -34,6 +36,9 @@ import socket
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -375,6 +380,40 @@ def load_theme_file(path: str) -> dict:
     return {str(k).lower(): str(v) for k, v in data.items()}
 
 
+THEME_CACHE_DIR = Path.home() / ".blender_gen_themes"
+THEME_URL_TIMEOUT = 10  # seconds
+
+
+def fetch_theme_url(url: str) -> dict:
+    """Download a theme JSON over http(s), cache by URL hash, return parsed dict.
+    Restricts scheme to http/https to avoid file:// and other smuggled URLs."""
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        print(f"Error: --theme-url scheme must be http or https, got {parsed.scheme!r}.", file=sys.stderr)
+        sys.exit(1)
+
+    THEME_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache_key = hashlib.sha256(url.encode()).hexdigest()[:16]
+    cache_path = THEME_CACHE_DIR / f"{cache_key}.json"
+
+    if cache_path.exists():
+        print(f"Theme cache hit: {cache_path.name}", file=sys.stderr)
+        return load_theme_file(str(cache_path))
+
+    print(f"Fetching theme from {url}...", file=sys.stderr)
+    req = urllib.request.Request(url, headers={"User-Agent": "claude-blender/0.14"})
+    try:
+        with urllib.request.urlopen(req, timeout=THEME_URL_TIMEOUT) as resp:  # noqa: S310 - scheme validated above
+            data = resp.read()
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        print(f"Error: --theme-url fetch failed: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    cache_path.write_bytes(data)
+    print(f"Theme cached: {cache_path}", file=sys.stderr)
+    return load_theme_file(str(cache_path))
+
+
 # ── iterate helper ────────────────────────────────────────────────────────────
 
 def _execute_with_iterate(script: str, args, label: str = "") -> str:
@@ -662,6 +701,10 @@ def main():
         help="JSON file {name: tokens} merged into PRESETS at startup; use with --preset NAME",
     )
     parser.add_argument(
+        "--theme-url", metavar="URL",
+        help="HTTPS URL of a JSON theme; cached to ~/.blender_gen_themes/; merges into PRESETS",
+    )
+    parser.add_argument(
         "--save-state", metavar="FILE",
         help="Append a JSONL replay record (mode, target, args) after this invocation",
     )
@@ -706,6 +749,8 @@ def main():
 
     if args.theme:
         PRESETS.update(load_theme_file(args.theme))
+    if args.theme_url:
+        PRESETS.update(fetch_theme_url(args.theme_url))
     if args.preset and args.preset not in PRESETS:
         parser.error(f"--preset {args.preset!r} not in available styles: {', '.join(PRESETS)}")
 

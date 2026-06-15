@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.13.0 · 2026-06-10 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.14.0 · 2026-06-11 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -122,10 +122,14 @@ Input modes
 - [x] `scenes/space_metaverse.py` — `ANIMATE` mode: `keyframe_sun_rotation()` (linear-interp keyframes, seamless loop) + `render_animation()` (PNG sequence to `~/space_metaverse_frames/`); single Galileo-orbit period; optional `ffmpeg -i frame_%04d.png out.mp4` post-processing
 - [x] No GIF dependency (Pillow/imageio): bpy-native PNG sequence keeps the pure-stdlib + bpy-only invariant intact
 
-### v0.14 — Next 🔲
-- [ ] `--theme-url URL`: download a JSON theme over HTTPS (stdlib `urllib`), cache to `~/.blender_gen_themes/`
-- [ ] `--retry N`: distinct from `--iterate` — retry the API call itself on transient network errors with exponential backoff
-- [ ] `scenes/space_metaverse.py` extension: lat/lon city skyline blocks (cubes) at GEO_MARKERS for cityscape feel
+### v0.14 — Shipped ✅ (dual-niche, 4th consecutive)
+- [x] `--theme-url URL`: fetch JSON theme over http(s); scheme allowlist (rejects `file://` et al.); SHA256-hashed cache at `~/.blender_gen_themes/<16hex>.json`; 10-second timeout; User-Agent header; reuses `load_theme_file` after download
+- [x] `scenes/space_metaverse.py` → `add_city_blocks()`: 3-5 jittered emissive cubes per GEO_MARKER (skipping Equator-Null); deterministic random seed; `SHOW_CITIES` flag, Earth-only; ~30 blocks total
+
+### v0.15 — Next 🔲
+- [ ] `--retry N`: distinct from `--iterate` — retry the **API call** on transient network errors with exponential backoff
+- [ ] `--list-presets`: print all (built-in + theme + theme-url) available styles and exit
+- [ ] `scenes/space_metaverse.py` extension: atmospheric scatter halo for Earth (Sky/sky texture node)
 
 ---
 
@@ -157,6 +161,7 @@ add_flag(NAME, EFFECT):
 - graceful degradation on any socket/file failure (warn + continue, never crash)
 - no hardcoded secrets · `ANTHROPIC_API_KEY` is the only auth surface
 - `shell=True` forbidden when stdlib has a native API (e.g. `os.startfile`)
+- network input (URL flags) validated against a scheme allowlist before any I/O (cf. `fetch_theme_url` v0.14)
 
 **Mutation history:**
 | Epoch | Diversity injected | Trigger |
@@ -170,6 +175,7 @@ add_flag(NAME, EFFECT):
 | v0.11 | `--exec FILE` (CLI flag, exec niche) | User asked to "execute space metaverse" → run_exec pipeline gap exposed; mutual-exclusive input mode added |
 | v0.12 | `--theme FILE` + Galileo orbit curves (**dual niche**) | EvoMetaClaw paired evolution: extend PRESETS surface area (CLI) + complete Galileo viz (content); wrap-aware curve algorithm new in toolkit |
 | v0.13 | `--save-state FILE` + space_metaverse ANIMATE (**dual niche**) | Recurring dual-niche pattern; replay log addresses reproducibility gap; PNG sequence avoids GIF native dep (ARM-safe) |
+| v0.14 | `--theme-url URL` + city skyline blocks (**dual niche, 4th**) | EvoMetaClaw ESS converging on dual-niche; first network surface (urllib), gated by scheme allowlist → security invariant intact |
 
 ---
 
@@ -183,6 +189,22 @@ add_flag(NAME, EFFECT):
 ---
 
 ## Changelog
+
+### v0.14.0 — 2026-06-11
+- `--theme-url URL`:
+  - `fetch_theme_url()` next to `load_theme_file`; same exit-on-error pattern
+  - Scheme allowlist `{http, https}` — `file://`, `data://`, `ftp://` etc. rejected before any I/O (verified: `file:///etc/passwd` → clean error, no read)
+  - SHA256-of-URL truncated to 16 hex chars → cache filename; distinct URLs (incl. query-string variants) get distinct cache entries
+  - Cache dir: `~/.blender_gen_themes/` (created on demand)
+  - `urllib.request` with 10-second timeout + User-Agent `claude-blender/0.14`; catches `URLError`, `TimeoutError`, `OSError`
+  - After download, reuses `load_theme_file` for parse + shape validation (single validation path)
+  - Wired in `main()` after `--theme`; URL themes override file themes on key collision
+- `scenes/space_metaverse.py` → `add_city_blocks()`:
+  - 3-5 jittered emissive cubes per GEO_MARKER (skip `Equator-Null`); `random.seed(99)` for determinism
+  - White-cyan emissive material, Z-scaled cube height 0.8-2.4
+  - `SHOW_CITIES` flag, Earth-only gate; ~30 blocks for 5 cities
+  - Session report now logs `cities=N`
+- v0.15 roadmap: `--retry N` (API-call retry, distinct from `--iterate`), `--list-presets`, atmospheric scatter halo for Earth
 
 ### v0.13.0 — 2026-06-10
 - `--save-state FILE`:
@@ -299,4 +321,4 @@ add_flag(NAME, EFFECT):
 
 ---
 
-*claude-blender Blueprint v0.13.0 · 2026-06-10 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.14.0 · 2026-06-11 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*

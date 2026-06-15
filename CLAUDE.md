@@ -30,9 +30,10 @@ python blender_gen.py "donut" --explain                                  # add r
 python blender_gen.py --exec scenes/space_metaverse.py --preview         # run file as-is
 python blender_gen.py "arcade" --theme themes_example.json --preset vaporwave  # custom theme
 python blender_gen.py "robot" --save-state runs.jsonl                    # replay log
+python blender_gen.py "city" --theme-url https://gist.../themes.json --preset noir  # remote theme
 ```
 
-## Flags (v0.13)
+## Flags (v0.14)
 | Flag | Effect |
 |------|--------|
 | `--send` | Execute script in running Blender via MCP socket |
@@ -59,6 +60,7 @@ python blender_gen.py "robot" --save-state runs.jsonl                    # repla
 | `--exec FILE` | Send a `.py` file to Blender as-is (no Claude call); auto-enables `--send` |
 | `--theme FILE` | Load JSON `{name: tokens}`; merged into `PRESETS` so `--preset NAME` can pick the new style |
 | `--save-state FILE` | Append a JSONL replay record (mode, target, non-default args) after each invocation |
+| `--theme-url URL` | Fetch JSON theme over http(s) (scheme allowlist); cache to `~/.blender_gen_themes/` |
 
 ## Files
 - `blender_gen.py` — main CLI, entry point

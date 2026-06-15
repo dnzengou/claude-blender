@@ -35,6 +35,7 @@ SHOW_CLIMATE = True         # Copernicus-style overlay
 SHOW_MARKERS = True         # Galileo lat/lon ground markers
 SHOW_GALILEO = True         # Galileo PRN constellation (24 satellites in orbit)
 SHOW_ORBITS = True          # Galileo orbit-path traces (one curve per plane)
+SHOW_CITIES = True          # extruded blocks at GEO_MARKERS — cityscape proxy
 SHOW_NIGHT = True           # translucent night-hemisphere overlay (UTC-driven)
 USE_REAL_SUN = True         # rotate sun azimuth by subsolar longitude (current UTC)
 ANIMATE = False             # if True: render a PNG sequence of one full sun rotation
@@ -242,6 +243,29 @@ def add_galileo_orbits(scale: float) -> None:
         obj.data.materials.append(mat)
 
 
+def add_city_blocks(scale: float) -> None:
+    """Tiny extruded blocks at each GEO_MARKER (cityscape proxy).
+    Skips Equator-Null (reference marker, no real city). Deterministic seed."""
+    mat = make_material("city_block", (0.85, 0.92, 1.0, 1.0), emission=2.5)
+    random.seed(99)
+    for label, lat, lon in GEO_MARKERS:
+        if label == "Equator-Null":
+            continue
+        x, y = latlon_to_xy(lat, lon, scale)
+        n_blocks = random.randint(3, 5)
+        for k in range(n_blocks):
+            height = random.uniform(0.8, 2.4)
+            jx = (random.random() - 0.5) * 1.4
+            jy = (random.random() - 0.5) * 1.4
+            bpy.ops.mesh.primitive_cube_add(
+                size=0.4, location=(x + jx, y + jy, 0.9 + height / 2),
+            )
+            cube = bpy.context.object
+            cube.scale.z = height
+            cube.name = f"CITY_{label}_{k:02d}"
+            cube.data.materials.append(mat)
+
+
 def add_night_overlay(scale: float) -> None:
     """Translucent dark plane centred on antisolar longitude (180° from subsolar)."""
     sub_lon = subsolar_lon_utc()
@@ -336,6 +360,8 @@ def main() -> None:
         add_galileo_satellites(TERRAIN_SCALE)
     if SHOW_ORBITS and PLANET == "earth":
         add_galileo_orbits(TERRAIN_SCALE)
+    if SHOW_CITIES and PLANET == "earth":
+        add_city_blocks(TERRAIN_SCALE)
     if SHOW_NIGHT and PLANET == "earth":
         add_night_overlay(TERRAIN_SCALE)
     add_lighting(cfg)
@@ -360,9 +386,10 @@ def main() -> None:
 
     sats = len(GALILEO_PRNS) if (SHOW_GALILEO and PLANET == "earth") else 0
     orbits = 3 if (SHOW_ORBITS and PLANET == "earth") else 0
+    cities = (len(GEO_MARKERS) - 1) if (SHOW_CITIES and PLANET == "earth") else 0  # -1 for Equator-Null
     print(f"[space_metaverse] planet={PLANET}  session={state['sessions']}  "
           f"markers={len(GEO_MARKERS)}  galileo={sats}  orbits={orbits}  "
-          f"terrain={2**TERRAIN_SUBDIV}x")
+          f"cities={cities}  terrain={2**TERRAIN_SUBDIV}x")
 
 
 main()
