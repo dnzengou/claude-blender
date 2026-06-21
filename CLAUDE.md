@@ -31,9 +31,10 @@ python blender_gen.py --exec scenes/space_metaverse.py --preview         # run f
 python blender_gen.py "arcade" --theme themes_example.json --preset vaporwave  # custom theme
 python blender_gen.py "robot" --save-state runs.jsonl                    # replay log
 python blender_gen.py "city" --theme-url https://gist.../themes.json --preset noir  # remote theme
+python blender_gen.py "tree" --retry 3                                    # retry on flaky network
 ```
 
-## Flags (v0.14)
+## Flags (v0.15)
 | Flag | Effect |
 |------|--------|
 | `--send` | Execute script in running Blender via MCP socket |
@@ -61,6 +62,7 @@ python blender_gen.py "city" --theme-url https://gist.../themes.json --preset no
 | `--theme FILE` | Load JSON `{name: tokens}`; merged into `PRESETS` so `--preset NAME` can pick the new style |
 | `--save-state FILE` | Append a JSONL replay record (mode, target, non-default args) after each invocation |
 | `--theme-url URL` | Fetch JSON theme over http(s) (scheme allowlist); cache to `~/.blender_gen_themes/` |
+| `--retry N` | Retry API call on transient errors (connection/timeout/429/5xx) with exponential backoff |
 
 ## Files
 - `blender_gen.py` — main CLI, entry point

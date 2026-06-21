@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.14.0 · 2026-06-11 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.15.0 · 2026-06-12 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -126,10 +126,15 @@ Input modes
 - [x] `--theme-url URL`: fetch JSON theme over http(s); scheme allowlist (rejects `file://` et al.); SHA256-hashed cache at `~/.blender_gen_themes/<16hex>.json`; 10-second timeout; User-Agent header; reuses `load_theme_file` after download
 - [x] `scenes/space_metaverse.py` → `add_city_blocks()`: 3-5 jittered emissive cubes per GEO_MARKER (skipping Equator-Null); deterministic random seed; `SHOW_CITIES` flag, Earth-only; ~30 blocks total
 
-### v0.15 — Next 🔲
-- [ ] `--retry N`: distinct from `--iterate` — retry the **API call** on transient network errors with exponential backoff
-- [ ] `--list-presets`: print all (built-in + theme + theme-url) available styles and exit
-- [ ] `scenes/space_metaverse.py` extension: atmospheric scatter halo for Earth (Sky/sky texture node)
+### v0.15 — Shipped ✅ (dual-niche, 5th consecutive)
+- [x] `--retry N`: API-call retry with exponential backoff (1s/2s/4s/8s..., capped at 30s); transient = `APIConnectionError`/`APITimeoutError`/`RateLimitError`/`InternalServerError`; permanent = 4xx (raised); legacy `retries=0` = single attempt
+- [x] `scenes/space_metaverse.py` → `add_atmosphere()`: World shader replaced with Nishita Sky Texture (`ShaderNodeTexSky`); graceful fallback to solid deep-blue on older Blender builds without that node; `SHOW_ATMOSPHERE` flag, Earth-only
+- [x] Self-tested retry: 2 transient errors → success on 3rd attempt; persistent error → raised after retries+1 attempts; `getattr` fallback to OSError/TimeoutError if SDK exception classes absent (forward-compat)
+
+### v0.16 — Next 🔲
+- [ ] `--list-presets`: print all available styles (built-in + theme + theme-url) and exit
+- [ ] `--rate-limit USD/min`: throttle batch calls to stay under a per-minute cost ceiling
+- [ ] `scenes/space_metaverse.py` extension: animate Galileo satellite ground-track (keyframe one PRN per plane around its orbit)
 
 ---
 
@@ -176,6 +181,7 @@ add_flag(NAME, EFFECT):
 | v0.12 | `--theme FILE` + Galileo orbit curves (**dual niche**) | EvoMetaClaw paired evolution: extend PRESETS surface area (CLI) + complete Galileo viz (content); wrap-aware curve algorithm new in toolkit |
 | v0.13 | `--save-state FILE` + space_metaverse ANIMATE (**dual niche**) | Recurring dual-niche pattern; replay log addresses reproducibility gap; PNG sequence avoids GIF native dep (ARM-safe) |
 | v0.14 | `--theme-url URL` + city skyline blocks (**dual niche, 4th**) | EvoMetaClaw ESS converging on dual-niche; first network surface (urllib), gated by scheme allowlist → security invariant intact |
+| v0.15 | `--retry N` + atmospheric Sky Texture (**dual niche, 5th**) | EvoMetaClaw ESS locked at dual-niche cadence; first resilience flag complements existing `--iterate`; first World-shader content mutation |
 
 ---
 
@@ -189,6 +195,20 @@ add_flag(NAME, EFFECT):
 ---
 
 ## Changelog
+
+### v0.15.0 — 2026-06-12
+- `--retry N`:
+  - `_transient_errors()`: resolves SDK exception classes lazily via `getattr` with stdlib fallbacks (forward-compat with SDK changes)
+  - `_call_with_retry(fn, retries)`: at most `retries+1` total attempts; sleep `min(2**attempt, 30)` seconds between attempts; retries=0 → single direct call (no wrapper overhead)
+  - Wraps both `client.messages.create` and `client.messages.stream` paths uniformly via a callable
+  - Self-tested: 2 transient + recover → success at attempt 3; persistent → raised after `retries+1`
+  - Default `retry=0` so cold-runs are unchanged
+  - Wired through `run_single` and `run_batch` via `args.retry`
+- `scenes/space_metaverse.py` → `add_atmosphere()`:
+  - `bpy.context.scene.world` replaced with Background+TexSky pipeline; Nishita model, `sun_elevation=35°`, `air_density=1.0`
+  - Graceful fallback to solid `(0.05, 0.10, 0.25, 1.0)` deep blue if `ShaderNodeTexSky` raises (older Blender builds)
+  - `SHOW_ATMOSPHERE` flag, Earth-only gate; first World-shader mutation in the scene
+- v0.16 roadmap: `--list-presets`, `--rate-limit USD/min`, animated PRN ground-track
 
 ### v0.14.0 — 2026-06-11
 - `--theme-url URL`:
@@ -321,4 +341,4 @@ add_flag(NAME, EFFECT):
 
 ---
 
-*claude-blender Blueprint v0.14.0 · 2026-06-11 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.15.0 · 2026-06-12 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*

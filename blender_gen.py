@@ -24,6 +24,7 @@ Usage:
     python blender_gen.py "cityscape" --theme themes.json --preset vaporwave
     python blender_gen.py "robot" --save-state runs.jsonl              # replay log
     python blender_gen.py "city" --theme-url https://example.com/themes.json --preset noir
+    python blender_gen.py "tree" --retry 3                            # retry on flaky network
 """
 
 import anthropic
@@ -307,10 +308,39 @@ EXPLAIN_SUFFIX = (
     "before the import line."
 )
 
+# Transient errors → retry. Anything else (auth/bad-request/not-found) → raise.
+# Resolved lazily to keep import side-effect-free if the SDK changes shape.
+def _transient_errors() -> tuple:
+    return (
+        getattr(anthropic, "APIConnectionError", OSError),
+        getattr(anthropic, "APITimeoutError", TimeoutError),
+        getattr(anthropic, "RateLimitError", OSError),
+        getattr(anthropic, "InternalServerError", OSError),
+    )
+
+
+def _call_with_retry(fn, retries: int):
+    """Invoke fn() with up to `retries` exponential-backoff retries on transient API errors.
+    Backoff: 1s, 2s, 4s, ... capped at 30s. retries=0 means single attempt (legacy behavior)."""
+    if retries <= 0:
+        return fn()
+    transient = _transient_errors()
+    for attempt in range(retries + 1):
+        try:
+            return fn()
+        except transient as exc:
+            if attempt >= retries:
+                raise
+            delay = min(2 ** attempt, 30)
+            print(f"  Transient API error ({type(exc).__name__}): {exc} — retrying in {delay}s "
+                  f"[{attempt + 1}/{retries}]", file=sys.stderr)
+            time.sleep(delay)
+
 
 def generate_blender_script(prompt: str, model: str, stream: bool = False, verbose: bool = False,
                              show_cost: bool = False, dry_run: bool = False,
-                             explain: bool = False, cost_sink: list | None = None) -> str:
+                             explain: bool = False, cost_sink: list | None = None,
+                             retries: int = 0) -> str:
     """Call Claude with a cached system prompt. Returns complete bpy script.
 
     dry_run=True skips the API call, prints the resolved model + prompt preview, returns "".
@@ -345,16 +375,19 @@ def generate_blender_script(prompt: str, model: str, stream: bool = False, verbo
                 cost_sink.append(c)
 
     if stream:
-        parts = []
-        with client.messages.stream(**kwargs) as s:
-            for text in s.text_stream:
-                print(text, end="", flush=True)
-                parts.append(text)
-        print()
-        _post(s.get_final_message().usage)
+        def _do_stream():
+            parts = []
+            with client.messages.stream(**kwargs) as s:
+                for text in s.text_stream:
+                    print(text, end="", flush=True)
+                    parts.append(text)
+            print()
+            return parts, s.get_final_message().usage
+        parts, usage = _call_with_retry(_do_stream, retries)
+        _post(usage)
         return "".join(parts)
 
-    response = client.messages.create(**kwargs)
+    response = _call_with_retry(lambda: client.messages.create(**kwargs), retries)
     _post(response.usage)
     return response.content[0].text
 
@@ -478,7 +511,7 @@ def run_single(prompt: str, args) -> None:
         prompt, model,
         stream=args.stream, verbose=args.verbose,
         show_cost=args.cost, dry_run=args.dry_run,
-        explain=args.explain,
+        explain=args.explain, retries=args.retry,
     )
 
     if not script:  # dry-run path; nothing downstream applies
@@ -531,7 +564,7 @@ def run_batch(prompts: list[str], args) -> None:
         script = generate_blender_script(
             prompt, model,
             verbose=args.verbose, show_cost=args.cost, dry_run=args.dry_run,
-            explain=args.explain, cost_sink=cost_sink,
+            explain=args.explain, cost_sink=cost_sink, retries=args.retry,
         )
 
         # Budget gate: halt before next call once cumulative spend exceeds threshold
@@ -689,6 +722,10 @@ def main():
     parser.add_argument(
         "--iterate", type=int, default=0, metavar="N",
         help="Auto-fix: if Blender reports an error, re-prompt Claude up to N times (requires --send)",
+    )
+    parser.add_argument(
+        "--retry", type=int, default=0, metavar="N",
+        help="Retry the API call on transient errors (connection, timeout, 429, 5xx) with exponential backoff",
     )
     parser.add_argument("--diff", action="store_true", help="Show scene object diff before/after execution (requires --send)")
     parser.add_argument("--preview", action="store_true", help="Render a 480x270 preview after execution and open it (requires --send)")
