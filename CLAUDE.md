@@ -29,9 +29,12 @@ python blender_gen.py --batch p.txt --cost-budget 0.25                   # halt 
 python blender_gen.py "donut" --explain                                  # add rationale
 python blender_gen.py --exec scenes/space_metaverse.py --preview         # run file as-is
 python blender_gen.py "arcade" --theme themes_example.json --preset vaporwave  # custom theme
+python blender_gen.py "robot" --save-state runs.jsonl                    # replay log
+python blender_gen.py "city" --theme-url https://gist.../themes.json --preset noir  # remote theme
+python blender_gen.py "tree" --retry 3                                    # retry on flaky network
 ```
 
-## Flags (v0.12)
+## Flags (v0.15)
 | Flag | Effect |
 |------|--------|
 | `--send` | Execute script in running Blender via MCP socket |
@@ -57,6 +60,9 @@ python blender_gen.py "arcade" --theme themes_example.json --preset vaporwave  #
 | `--explain` | Prepend a `# Design rationale:` comment block to the generated script |
 | `--exec FILE` | Send a `.py` file to Blender as-is (no Claude call); auto-enables `--send` |
 | `--theme FILE` | Load JSON `{name: tokens}`; merged into `PRESETS` so `--preset NAME` can pick the new style |
+| `--save-state FILE` | Append a JSONL replay record (mode, target, non-default args) after each invocation |
+| `--theme-url URL` | Fetch JSON theme over http(s) (scheme allowlist); cache to `~/.blender_gen_themes/` |
+| `--retry N` | Retry API call on transient errors (connection/timeout/429/5xx) with exponential backoff |
 
 ## Files
 - `blender_gen.py` — main CLI, entry point

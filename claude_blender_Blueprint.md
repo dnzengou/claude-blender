@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.12.0 · 2026-06-09 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.15.0 · 2026-06-12 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -117,10 +117,24 @@ Input modes
 - [x] `themes_example.json`: 3 demo styles (`vaporwave`, `noir`, `solarpunk`)
 - [x] `scenes/space_metaverse.py` — `add_galileo_orbits()`: one POLY curve per orbital plane, 60-sample mean-anomaly sweep, **wrap-aware** (splits curve at lon=±180° boundary so the trace doesn't cross the equirectangular map); bevelled cyan emissive; `SHOW_ORBITS` flag, Earth-only gate
 
-### v0.13 — Next 🔲
-- [ ] `--save-state FILE`: persist `args` namespace + last prompt to a `.jsonl` rerun log
-- [ ] `scenes/space_metaverse.py` extension: rotating GIF export (single command renders animation of one Galileo orbit)
-- [ ] `--theme-url URL`: download a JSON theme over HTTPS (stdlib `urllib`), cache locally
+### v0.13 — Shipped ✅ (dual-niche)
+- [x] `--save-state FILE`: append JSONL record of each CLI invocation (mode, target, non-default args); replay-ready; cache-safe (no API impact)
+- [x] `scenes/space_metaverse.py` — `ANIMATE` mode: `keyframe_sun_rotation()` (linear-interp keyframes, seamless loop) + `render_animation()` (PNG sequence to `~/space_metaverse_frames/`); single Galileo-orbit period; optional `ffmpeg -i frame_%04d.png out.mp4` post-processing
+- [x] No GIF dependency (Pillow/imageio): bpy-native PNG sequence keeps the pure-stdlib + bpy-only invariant intact
+
+### v0.14 — Shipped ✅ (dual-niche, 4th consecutive)
+- [x] `--theme-url URL`: fetch JSON theme over http(s); scheme allowlist (rejects `file://` et al.); SHA256-hashed cache at `~/.blender_gen_themes/<16hex>.json`; 10-second timeout; User-Agent header; reuses `load_theme_file` after download
+- [x] `scenes/space_metaverse.py` → `add_city_blocks()`: 3-5 jittered emissive cubes per GEO_MARKER (skipping Equator-Null); deterministic random seed; `SHOW_CITIES` flag, Earth-only; ~30 blocks total
+
+### v0.15 — Shipped ✅ (dual-niche, 5th consecutive)
+- [x] `--retry N`: API-call retry with exponential backoff (1s/2s/4s/8s..., capped at 30s); transient = `APIConnectionError`/`APITimeoutError`/`RateLimitError`/`InternalServerError`; permanent = 4xx (raised); legacy `retries=0` = single attempt
+- [x] `scenes/space_metaverse.py` → `add_atmosphere()`: World shader replaced with Nishita Sky Texture (`ShaderNodeTexSky`); graceful fallback to solid deep-blue on older Blender builds without that node; `SHOW_ATMOSPHERE` flag, Earth-only
+- [x] Self-tested retry: 2 transient errors → success on 3rd attempt; persistent error → raised after retries+1 attempts; `getattr` fallback to OSError/TimeoutError if SDK exception classes absent (forward-compat)
+
+### v0.16 — Next 🔲
+- [ ] `--list-presets`: print all available styles (built-in + theme + theme-url) and exit
+- [ ] `--rate-limit USD/min`: throttle batch calls to stay under a per-minute cost ceiling
+- [ ] `scenes/space_metaverse.py` extension: animate Galileo satellite ground-track (keyframe one PRN per plane around its orbit)
 
 ---
 
@@ -152,6 +166,7 @@ add_flag(NAME, EFFECT):
 - graceful degradation on any socket/file failure (warn + continue, never crash)
 - no hardcoded secrets · `ANTHROPIC_API_KEY` is the only auth surface
 - `shell=True` forbidden when stdlib has a native API (e.g. `os.startfile`)
+- network input (URL flags) validated against a scheme allowlist before any I/O (cf. `fetch_theme_url` v0.14)
 
 **Mutation history:**
 | Epoch | Diversity injected | Trigger |
@@ -164,6 +179,9 @@ add_flag(NAME, EFFECT):
 | v0.10 | `--cost-budget` + `--explain` + space_metaverse Galileo/night extensions (**dual niche**) | EvoMetaClaw simultaneous content+CLI evolution — recipe absorbs both axes in one epoch |
 | v0.11 | `--exec FILE` (CLI flag, exec niche) | User asked to "execute space metaverse" → run_exec pipeline gap exposed; mutual-exclusive input mode added |
 | v0.12 | `--theme FILE` + Galileo orbit curves (**dual niche**) | EvoMetaClaw paired evolution: extend PRESETS surface area (CLI) + complete Galileo viz (content); wrap-aware curve algorithm new in toolkit |
+| v0.13 | `--save-state FILE` + space_metaverse ANIMATE (**dual niche**) | Recurring dual-niche pattern; replay log addresses reproducibility gap; PNG sequence avoids GIF native dep (ARM-safe) |
+| v0.14 | `--theme-url URL` + city skyline blocks (**dual niche, 4th**) | EvoMetaClaw ESS converging on dual-niche; first network surface (urllib), gated by scheme allowlist → security invariant intact |
+| v0.15 | `--retry N` + atmospheric Sky Texture (**dual niche, 5th**) | EvoMetaClaw ESS locked at dual-niche cadence; first resilience flag complements existing `--iterate`; first World-shader content mutation |
 
 ---
 
@@ -177,6 +195,50 @@ add_flag(NAME, EFFECT):
 ---
 
 ## Changelog
+
+### v0.15.0 — 2026-06-12
+- `--retry N`:
+  - `_transient_errors()`: resolves SDK exception classes lazily via `getattr` with stdlib fallbacks (forward-compat with SDK changes)
+  - `_call_with_retry(fn, retries)`: at most `retries+1` total attempts; sleep `min(2**attempt, 30)` seconds between attempts; retries=0 → single direct call (no wrapper overhead)
+  - Wraps both `client.messages.create` and `client.messages.stream` paths uniformly via a callable
+  - Self-tested: 2 transient + recover → success at attempt 3; persistent → raised after `retries+1`
+  - Default `retry=0` so cold-runs are unchanged
+  - Wired through `run_single` and `run_batch` via `args.retry`
+- `scenes/space_metaverse.py` → `add_atmosphere()`:
+  - `bpy.context.scene.world` replaced with Background+TexSky pipeline; Nishita model, `sun_elevation=35°`, `air_density=1.0`
+  - Graceful fallback to solid `(0.05, 0.10, 0.25, 1.0)` deep blue if `ShaderNodeTexSky` raises (older Blender builds)
+  - `SHOW_ATMOSPHERE` flag, Earth-only gate; first World-shader mutation in the scene
+- v0.16 roadmap: `--list-presets`, `--rate-limit USD/min`, animated PRN ground-track
+
+### v0.14.0 — 2026-06-11
+- `--theme-url URL`:
+  - `fetch_theme_url()` next to `load_theme_file`; same exit-on-error pattern
+  - Scheme allowlist `{http, https}` — `file://`, `data://`, `ftp://` etc. rejected before any I/O (verified: `file:///etc/passwd` → clean error, no read)
+  - SHA256-of-URL truncated to 16 hex chars → cache filename; distinct URLs (incl. query-string variants) get distinct cache entries
+  - Cache dir: `~/.blender_gen_themes/` (created on demand)
+  - `urllib.request` with 10-second timeout + User-Agent `claude-blender/0.14`; catches `URLError`, `TimeoutError`, `OSError`
+  - After download, reuses `load_theme_file` for parse + shape validation (single validation path)
+  - Wired in `main()` after `--theme`; URL themes override file themes on key collision
+- `scenes/space_metaverse.py` → `add_city_blocks()`:
+  - 3-5 jittered emissive cubes per GEO_MARKER (skip `Equator-Null`); `random.seed(99)` for determinism
+  - White-cyan emissive material, Z-scaled cube height 0.8-2.4
+  - `SHOW_CITIES` flag, Earth-only gate; ~30 blocks for 5 cities
+  - Session report now logs `cities=N`
+- v0.15 roadmap: `--retry N` (API-call retry, distinct from `--iterate`), `--list-presets`, atmospheric scatter halo for Earth
+
+### v0.13.0 — 2026-06-10
+- `--save-state FILE`:
+  - `_save_state()` helper next to `_log_history`; same OSError-tolerant append-mode pattern
+  - Records `{ts, mode, target, args}` where `args` is `vars(args)` filtered of None/False/0/"" + `save_state` key itself
+  - Mode ∈ `{single, batch, exec, watch}`; target is the prompt / batch file / exec file / watch file
+  - Fires once per `main()` invocation after the dispatched run completes
+  - Self-tested: dry-run + auto-model + save-state → record contains `mode=single, target='spinning torus', args=['auto_model','dry_run','host','model','port','prompt']`
+- `scenes/space_metaverse.py` → `ANIMATE` mode:
+  - `keyframe_sun_rotation()`: keyframes Z-rotation at frame 1 and frame ANIM_FRAMES+1 → seamless loop; switches all keyframe interpolation to LINEAR for steady spin
+  - `render_animation()`: iterates `[frame_start, frame_end]`, writes `frame_NNNN.png` to `~/space_metaverse_frames/`
+  - `ANIMATE`, `ANIM_FRAMES=60`, `ANIM_DIR` flags at module top; OFF by default to keep cold-run cheap
+  - Optional post-step: `ffmpeg -i ~/space_metaverse_frames/frame_%04d.png out.mp4` (external; bpy itself doesn't ship video encoder on all platforms)
+- v0.14 roadmap: `--theme-url URL`, `--retry N`, space_metaverse city skyline blocks
 
 ### v0.12.0 — 2026-06-09
 - `--theme FILE`:
@@ -279,4 +341,4 @@ add_flag(NAME, EFFECT):
 
 ---
 
-*claude-blender Blueprint v0.12.0 · 2026-06-09 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.15.0 · 2026-06-12 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
