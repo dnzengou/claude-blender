@@ -25,6 +25,8 @@ Usage:
     python blender_gen.py "robot" --save-state runs.jsonl              # replay log
     python blender_gen.py "city" --theme-url https://example.com/themes.json --preset noir
     python blender_gen.py "tree" --retry 3                            # retry on flaky network
+    python blender_gen.py --list-presets                              # discover styles + exit
+    python blender_gen.py "spiral" --history log.jsonl --rate 5       # feed flywheel
 """
 
 import anthropic
@@ -42,6 +44,15 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+
+# Force UTF-8 on stdout/stderr so help text and messages don't crash on Windows cp1252 consoles.
+# reconfigure() is 3.7+; guard for older stdio wrappers that lack it.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8")
+        except Exception:  # noqa: BLE001 — defensive: never crash on stream config
+            pass
 
 MCP_TIMEOUT = 10  # seconds
 
@@ -230,14 +241,19 @@ def _pick_model(prompt: str, default: str) -> str:
     return default
 
 
-def _log_history(path: str, model: str, prompt: str, script: str) -> None:
-    """Append one JSONL record per generation. Safe to share across processes (append-mode)."""
+def _log_history(path: str, model: str, prompt: str, script: str, rating: int | None = None) -> None:
+    """Append one JSONL record per generation. Safe to share across processes (append-mode).
+
+    rating (1-5, optional) is the user's quality score — the SkillOpt training signal.
+    Labeled prompt-script-rating tuples accumulate into a fine-tuning corpus over time."""
     record = {
         "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "model": model,
         "prompt": prompt,
         "script": script,
     }
+    if rating is not None:
+        record["rating"] = rating
     try:
         with open(path, "a", encoding="utf-8") as f:
             f.write(json.dumps(record) + "\n")
@@ -518,7 +534,7 @@ def run_single(prompt: str, args) -> None:
         return
 
     if args.history:
-        _log_history(args.history, model, prompt, script)
+        _log_history(args.history, model, prompt, script, rating=args.rate)
 
     if args.output:
         _write_file(args.output, script)
@@ -582,7 +598,7 @@ def run_batch(prompts: list[str], args) -> None:
         _write_file(str(out_path), script)
 
         if args.history:
-            _log_history(args.history, model, prompt, script)
+            _log_history(args.history, model, prompt, script, rating=args.rate)
 
         if args.send:
             scene_before = _snapshot(args.host, args.port) if args.diff else None
@@ -694,11 +710,12 @@ def _send(script: str, host: str, port: int) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Claude → Blender: natural language to bpy scripts"
+        description="Claude -> Blender: natural language to bpy scripts"
     )
 
-    # Mutually exclusive input modes
-    input_group = parser.add_mutually_exclusive_group(required=True)
+    # Input modes are mutually exclusive but not always required
+    # (--list-presets exits before any input is needed).
+    input_group = parser.add_mutually_exclusive_group()
     input_group.add_argument("prompt", nargs="?", help="What to build in Blender")
     input_group.add_argument("--batch", metavar="FILE", help="File of prompts (one per line)")
     input_group.add_argument("--watch", metavar="FILE", help="Prompt text file to watch; regenerate on each save")
@@ -746,12 +763,21 @@ def main():
         help="Append a JSONL replay record (mode, target, args) after this invocation",
     )
     parser.add_argument(
+        "--list-presets", action="store_true",
+        help="Print all available styles (built-in + --theme + --theme-url) and exit",
+    )
+    parser.add_argument(
+        "--rate", type=int, metavar="N", default=None,
+        help="Rating 1-5 for the last generation; appended to --history JSONL as {rating: N} "
+             "(requires --history; enables the SkillOpt training-data flywheel)",
+    )
+    parser.add_argument(
         "--history", metavar="FILE",
         help="Append JSONL {ts, model, prompt, script} record after each generation",
     )
     parser.add_argument(
         "--auto-model", action="store_true",
-        help="Route by prompt: short edits (≤8 words + edit verb) → haiku; long (>20 words) → opus",
+        help="Route by prompt: short edits (<=8 words + edit verb) -> haiku; long (>20 words) -> opus",
     )
     parser.add_argument(
         "--cost", action="store_true",
@@ -788,8 +814,25 @@ def main():
         PRESETS.update(load_theme_file(args.theme))
     if args.theme_url:
         PRESETS.update(fetch_theme_url(args.theme_url))
+
+    if args.list_presets:
+        for name in sorted(PRESETS):
+            tokens = PRESETS[name].strip()
+            preview = tokens if len(tokens) <= 80 else tokens[:77] + "..."
+            print(f"  {name:<12}  {preview}")
+        return
+
+    if args.rate is not None:
+        if not 1 <= args.rate <= 5:
+            parser.error(f"--rate must be 1-5, got {args.rate}")
+        if not args.history:
+            parser.error("--rate requires --history (rating attaches to the log record)")
+
     if args.preset and args.preset not in PRESETS:
         parser.error(f"--preset {args.preset!r} not in available styles: {', '.join(PRESETS)}")
+
+    if not (args.prompt or args.batch or args.watch or args.exec_path):
+        parser.error("one of the arguments prompt --batch --watch --exec is required")
 
     if args.exec_path:
         run_exec(args.exec_path, args)

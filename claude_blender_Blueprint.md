@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.15.0 · 2026-06-12 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.16.0 · 2026-06-13 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -131,10 +131,16 @@ Input modes
 - [x] `scenes/space_metaverse.py` → `add_atmosphere()`: World shader replaced with Nishita Sky Texture (`ShaderNodeTexSky`); graceful fallback to solid deep-blue on older Blender builds without that node; `SHOW_ATMOSPHERE` flag, Earth-only
 - [x] Self-tested retry: 2 transient errors → success on 3rd attempt; persistent error → raised after retries+1 attempts; `getattr` fallback to OSError/TimeoutError if SDK exception classes absent (forward-compat)
 
-### v0.16 — Next 🔲
-- [ ] `--list-presets`: print all available styles (built-in + theme + theme-url) and exit
+### v0.16 — Shipped ✅ (production-readiness + moat activation)
+- [x] **Windows `--help` fix**: replaced Unicode `→` / `≤` in argparse help strings + description with ASCII; added UTF-8 `reconfigure()` on stdout/stderr — help now runs on cp1252 consoles without traceback (was a first-touch UX crash for Windows users)
+- [x] `--list-presets`: prints all available styles (built-in + `--theme` + `--theme-url`) with truncated token previews and exits; mutually-exclusive input group loosened to `required=False` + manual guard so `--list-presets` works standalone
+- [x] `--rate 1..5`: user quality score attached to `--history` JSONL record; requires `--history` (validated); rating field is optional in the record (unrated entries stay compact) — **completes the SkillOpt flywheel**: prompt → script → rating → labeled training corpus over time
+- [x] `_log_history` extended with `rating: int | None` param; call sites in `run_single` + `run_batch` both pass `args.rate`
+
+### v0.17 — Next 🔲
 - [ ] `--rate-limit USD/min`: throttle batch calls to stay under a per-minute cost ceiling
-- [ ] `scenes/space_metaverse.py` extension: animate Galileo satellite ground-track (keyframe one PRN per plane around its orbit)
+- [ ] `--corpus-stats FILE`: read a `--history` JSONL and print rating distribution, top prompts by rating, model-vs-rating pivot
+- [ ] `scenes/space_metaverse.py` extension: animate one Galileo PRN per plane around its orbit
 
 ---
 
@@ -182,6 +188,35 @@ add_flag(NAME, EFFECT):
 | v0.13 | `--save-state FILE` + space_metaverse ANIMATE (**dual niche**) | Recurring dual-niche pattern; replay log addresses reproducibility gap; PNG sequence avoids GIF native dep (ARM-safe) |
 | v0.14 | `--theme-url URL` + city skyline blocks (**dual niche, 4th**) | EvoMetaClaw ESS converging on dual-niche; first network surface (urllib), gated by scheme allowlist → security invariant intact |
 | v0.15 | `--retry N` + atmospheric Sky Texture (**dual niche, 5th**) | EvoMetaClaw ESS locked at dual-niche cadence; first resilience flag complements existing `--iterate`; first World-shader content mutation |
+| v0.16 | Windows help fix + `--list-presets` + `--rate` (**production-readiness + moat activation**) | User E-audit exposed first-touch help crash on Windows; `--rate` closes the SkillOpt flywheel (labeled corpus over time) — strategic differentiator, not a registry-copyable feature |
+
+---
+
+## Strategic Moat (EvoMetaClaw / SkillOpt)
+
+A registry (themes, presets, scenes) is trivially copyable — anyone can fork `themes_example.json` or `scenes/*.py` and paste them into their own tool. The competitive moat is not in the assets; it is in the **self-evolving loop over accumulated trajectory data**.
+
+**The flywheel (shipped v0.16):**
+
+```
+user prompt  →  Claude generation  →  bpy script  →  runs / edits / user rates
+     ↑                                                              │
+     │                                                              ▼
+     └──────  --auto-model reroutes    ←── --history + --rate JSONL corpus
+              --preset expands              (labelled prompt-script-rating triples)
+              --explain enriches            ↓
+              --theme / --theme-url         (offline analysis: which prompts get 5-star
+                                             results with which model + preset + theme;
+                                             which fail; auto-curate presets over time)
+```
+
+**Why this is defensible:**
+1. **Data compounds locally**: each user's `--history` file is a private, labelled dataset of *their* domain (their scenes, their vocabulary, their taste). Not copyable — it belongs to them.
+2. **Preset auto-curation** (v0.17 roadmap `--corpus-stats`): after N rated runs, the tool can propose theme mutations (e.g. "your 5-star cyberpunk generations differ from the built-in cyberpunk preset by these tokens — save as `cyberpunk_v2`?"). That's SkillOpt applied to a preset.
+3. **Model routing improves with data**: `--auto-model` is currently a static heuristic (edit-verb + word-count). With a rated corpus, it can be a *learned* router — send prompts to the cheapest model that produced ≥4-star results on similar prompts.
+4. **Every session mutates the Workflow Genome**: the mutation-history table above records what worked and what failed across 12+ epochs. That is a live evolutionary record — the EvoMetaClaw ESS the project has converged on. Copying the repo copies the artifacts; it does not copy the paradigm.
+
+**Rebuild cost for a competitor:** entire training paradigm + accumulated trajectory data across multiple domains + the recipe extraction. High.
 
 ---
 
@@ -195,6 +230,21 @@ add_flag(NAME, EFFECT):
 ---
 
 ## Changelog
+
+### v0.16.0 — 2026-06-13
+- **Production-readiness fix (Windows first-touch UX)**: `--help` crashed with `UnicodeEncodeError` on cp1252 consoles because argparse tried to emit `→` / `≤` in help strings. Two changes:
+  1. Replaced Unicode in argparse `description=` and `--auto-model` `help=` with ASCII (`->` / `<=`)
+  2. `sys.stdout.reconfigure(encoding="utf-8")` and same for stderr at module load — defensive `getattr` + try/except so it's a no-op on non-supporting streams
+- `--list-presets`:
+  - Prints sorted `PRESETS` (after `--theme` / `--theme-url` merge) with 80-char preview per style, exits 0
+  - Mutually-exclusive input group loosened to `required=False`; manual guard before dispatch ensures prompt/`--batch`/`--watch`/`--exec` still required for non-`--list-presets` runs
+- `--rate 1..5` (**SkillOpt flywheel closer**):
+  - Attaches user quality score to the `--history` JSONL record
+  - Requires `--history` (validated with clear error message)
+  - `_log_history` gained optional `rating: int | None`; unrated entries omit the field to keep records compact
+  - Combined with existing `--history` and `--save-state`, produces labelled prompt-script-rating triples — the local corpus that seeds any future fine-tune or auto-router
+- Blueprint gained explicit **Strategic Moat** section documenting the EvoMetaClaw rationale: assets are copyable, the self-evolving loop over accumulated trajectory data is not
+- v0.17 roadmap: `--rate-limit USD/min`, `--corpus-stats FILE`, animated PRN ground-track
 
 ### v0.15.0 — 2026-06-12
 - `--retry N`:
@@ -341,4 +391,4 @@ add_flag(NAME, EFFECT):
 
 ---
 
-*claude-blender Blueprint v0.15.0 · 2026-06-12 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.16.0 · 2026-06-13 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
