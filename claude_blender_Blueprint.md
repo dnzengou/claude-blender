@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.16.0 · 2026-06-13 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.17.0 · 2026-07-19 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -137,9 +137,17 @@ Input modes
 - [x] `--rate 1..5`: user quality score attached to `--history` JSONL record; requires `--history` (validated); rating field is optional in the record (unrated entries stay compact) — **completes the SkillOpt flywheel**: prompt → script → rating → labeled training corpus over time
 - [x] `_log_history` extended with `rating: int | None` param; call sites in `run_single` + `run_batch` both pass `args.rate`
 
-### v0.17 — Next 🔲
+### v0.17 — Shipped ✅ (user demo · Space Metaverse value prop)
+- [x] `--demo NAME`: one-liner user demo — 4 built-in scenes covering the Space Metaverse master blueprint's KafCade hierarchy (BODY level: earth/moon/mars via `scenes/space_metaverse.py`; REGION level: cyberpunk via `scenes/cyberpunk_city.py`)
+- [x] `--list-demos`: catalog with KafCade mission-brief lines (`UNIVERSE -> GALAXY SOL -> SYSTEM 3 -> BODY TERRA` etc.), CLI echo of the Kimi Space Metaverse HUD
+- [x] `_print_mission_brief()`: in-terminal UX moment before every demo send — inspired by the Kimi web build's loading-screen UX
+- [x] In-memory `PLANET` constant patch for space demos — single-line regex substitution, disk file unchanged, planet variants without duplication
+- [x] Auto-enables `--send` before `--send` guards (same pattern as `--exec`); composable with `--diff` / `--preview` / `--iterate`
+
+### v0.18 — Next 🔲
 - [ ] `--rate-limit USD/min`: throttle batch calls to stay under a per-minute cost ceiling
-- [ ] `--corpus-stats FILE`: read a `--history` JSONL and print rating distribution, top prompts by rating, model-vs-rating pivot
+- [ ] `--corpus-stats FILE`: rating distribution + top prompts + model-vs-rating pivot from `--history`
+- [ ] `--demo mission-control`: multi-agent AI-collaborative Mission Control demo (Space Metaverse §9.2 use case)
 - [ ] `scenes/space_metaverse.py` extension: animate one Galileo PRN per plane around its orbit
 
 ---
@@ -189,6 +197,7 @@ add_flag(NAME, EFFECT):
 | v0.14 | `--theme-url URL` + city skyline blocks (**dual niche, 4th**) | EvoMetaClaw ESS converging on dual-niche; first network surface (urllib), gated by scheme allowlist → security invariant intact |
 | v0.15 | `--retry N` + atmospheric Sky Texture (**dual niche, 5th**) | EvoMetaClaw ESS locked at dual-niche cadence; first resilience flag complements existing `--iterate`; first World-shader content mutation |
 | v0.16 | Windows help fix + `--list-presets` + `--rate` (**production-readiness + moat activation**) | User E-audit exposed first-touch help crash on Windows; `--rate` closes the SkillOpt flywheel (labeled corpus over time) — strategic differentiator, not a registry-copyable feature |
+| v0.17 | `--demo NAME` + `--list-demos` (**user demo · value-prop showcase**) | External input: Space Metaverse master blueprint (2026-07-17) + Kimi cyberpunk vertical-slice; `--demo` collapses 5-flag composition into a single command that maps onto the blueprint's KafCade hierarchy — commercial low-hanging fruit for user onboarding |
 
 ---
 
@@ -218,6 +227,26 @@ user prompt  →  Claude generation  →  bpy script  →  runs / edits / user r
 
 **Rebuild cost for a competitor:** entire training paradigm + accumulated trajectory data across multiple domains + the recipe extraction. High.
 
+### Space Metaverse master blueprint — what claude-blender delivers today
+
+The Space Metaverse master blueprint (v1.0 · 2026-07-17) defines a full stack: Rust+Bevy+WebGPU client, Redpanda world bus, S2-cell parcels, EvoForge trajectory training. `claude-blender` is a **content-generation and demo-authoring wedge** in that stack — the Blender-side of the "digital-twin Earth + orbital layer" pipeline.
+
+| Blueprint element | Delivered by claude-blender v0.17 | Notes |
+|---|---|---|
+| **KafCade BODY level** (Earth/Moon/Mars) | ✅ `--demo earth/moon/mars` | `scenes/space_metaverse.py` — 24-sat Galileo constellation, Copernicus climate overlay proxy, atmospheric Sky Texture, night hemisphere |
+| **KafCade REGION level** | ✅ `--demo cyberpunk` | `scenes/cyberpunk_city.py` — S2-cell-equivalent city grid |
+| **Trajectory capture (agent.traj)** | ✅ `--history` + `--rate` | JSONL corpus of `{prompt, script, rating}` — SkillOpt training feed |
+| **KafCa streaming discipline** | ✅ `--save-state` + `--history` | Two append-mode JSONL streams; audit path per E command |
+| **Content styling** | ✅ `--preset` + `--theme` + `--theme-url` | Local + network-loaded presets, scheme-allowlist validated |
+| **Cost/quality gate** | ✅ `--cost` + `--cost-budget` + `--dry-run` + `--auto-model` | RRSS-`So` (Solidify) cost-side |
+| **Resilience** | ✅ `--retry` + `--iterate` | RRSS-`Rb` (Robustify) — API-side + Blender-side backoff |
+| **Adoption (ARM-A)** | ✅ `--list-demos` + `--list-presets` + `--demo NAME` | Discovery UX + one-liner onboarding |
+| ***Not yet***: Rust/Bevy client | 🔲 | Blueprint §5 — separate repo when it lands |
+| ***Not yet***: On-chain economy | 🔲 | Blueprint §7 — Blender-side previews of ownable parcels planned for v0.18 |
+| ***Not yet***: Mission Control multi-agent | 🔲 | Blueprint §9.2 — `--demo mission-control` in v0.18 roadmap |
+
+**Positioning:** claude-blender is the *content-forge* upstream of the world-server + client — where scenes and skills are authored, rated, and versioned before shipping. Every user session here accretes into the same trajectory corpus the blueprint's EvoForge consumes downstream.
+
 ---
 
 ## API Integrations
@@ -230,6 +259,21 @@ user prompt  →  Claude generation  →  bpy script  →  runs / edits / user r
 ---
 
 ## Changelog
+
+### v0.17.0 — 2026-07-19
+- **User demo shipped** — collapses the Space Metaverse value prop into `python blender_gen.py --demo earth --preview`
+- `DEMOS` module-level registry (4 entries) — `{name: {scene, planet, brief}}` shape; each maps to a KafCade mission-brief line inspired by the Kimi vertical-slice HUD
+- `run_demo(name, args)`:
+  - Reads scene file from disk
+  - For space demos (`earth`/`moon`/`mars`): in-memory regex substitution of `PLANET` constant → three planet variants from a single scene file, disk unchanged
+  - Prints mission-brief header (`SPACE METAVERSE · DEMO: NAME` + KafCade line + scene path)
+  - Sends to Blender via `_send` or `_execute_with_iterate` (composable with `--iterate`)
+  - Full downstream integration: `--diff` / `--preview` / `--save-state` all work
+- `--list-demos`: catalog output with mission-brief lines + scene paths; sits next to `--list-presets` (same UX shape)
+- Auto-enables `--send` before `--send` guards (same pattern as `--exec` gained in v0.11)
+- Mutually-exclusive input group extended to 5 modes: `prompt` / `--batch` / `--watch` / `--exec` / `--demo`
+- Blueprint gained **Space Metaverse master blueprint** mapping — explicit table of what claude-blender delivers today vs the full-stack roadmap
+- v0.18 roadmap seeds: `--rate-limit USD/min`, `--corpus-stats`, `--demo mission-control`, animated PRN
 
 ### v0.16.0 — 2026-06-13
 - **Production-readiness fix (Windows first-touch UX)**: `--help` crashed with `UnicodeEncodeError` on cp1252 consoles because argparse tried to emit `→` / `≤` in help strings. Two changes:
@@ -391,4 +435,4 @@ user prompt  →  Claude generation  →  bpy script  →  runs / edits / user r
 
 ---
 
-*claude-blender Blueprint v0.16.0 · 2026-06-13 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.17.0 · 2026-07-19 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*

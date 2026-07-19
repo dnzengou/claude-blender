@@ -27,6 +27,8 @@ Usage:
     python blender_gen.py "tree" --retry 3                            # retry on flaky network
     python blender_gen.py --list-presets                              # discover styles + exit
     python blender_gen.py "spiral" --history log.jsonl --rate 5       # feed flywheel
+    python blender_gen.py --list-demos                                # Space Metaverse catalog
+    python blender_gen.py --demo earth --preview                      # one-liner demo
 """
 
 import anthropic
@@ -78,6 +80,20 @@ PRESETS: dict[str, str] = {
     "abstract":  "Style: abstract geometric art — bold primary colors, hard-edge materials, dramatic directional lighting, mathematical precision. ",
     "scifi":     "Style: hard-surface sci-fi — metallic panels with subtle emission, modular geometry, cool blue/white lighting, clean industrial aesthetic. ",
     "toon":      "Style: toon-shaded cartoon — flat colors with Toon BSDF, thick outlines via Solidify modifier, bright saturated palette, no cast shadows. ",
+}
+
+# One-liner demos — showcase the value proposition without composing 5 flags.
+# Each maps NAME -> {scene: file, planet: earth|moon|mars|None, brief: KafCade mission line}
+# planet=None means send as-is; otherwise patch PLANET constant before sending.
+DEMOS: dict[str, dict] = {
+    "earth":     {"scene": "scenes/space_metaverse.py", "planet": "earth",
+                  "brief": "UNIVERSE -> GALAXY SOL -> SYSTEM 3 -> BODY TERRA"},
+    "moon":      {"scene": "scenes/space_metaverse.py", "planet": "moon",
+                  "brief": "UNIVERSE -> GALAXY SOL -> SYSTEM 3 -> BODY LUNA"},
+    "mars":      {"scene": "scenes/space_metaverse.py", "planet": "mars",
+                  "brief": "UNIVERSE -> GALAXY SOL -> SYSTEM 3 -> BODY ARES"},
+    "cyberpunk": {"scene": "scenes/cyberpunk_city.py", "planet": None,
+                  "brief": "UNIVERSE -> GALAXY SOL -> SYSTEM 3 -> BODY TERRA -> REGION NEO-KYOTO"},
 }
 
 # Bpy script sent to Blender to render a fast preview frame.
@@ -646,6 +662,60 @@ def run_exec(path: str, args) -> None:
         _render_preview(args.host, args.port)
 
 
+# ── demo pipeline ─────────────────────────────────────────────────────────────
+
+def _print_mission_brief(name: str, cfg: dict) -> None:
+    """Print a KafCade mission-brief header — CLI echo of the Kimi HUD."""
+    print(f"\n{'═' * 60}", file=sys.stderr)
+    print(f" SPACE METAVERSE · DEMO: {name.upper()}", file=sys.stderr)
+    print(f" {cfg['brief']}", file=sys.stderr)
+    print(f" scene: {cfg['scene']}", file=sys.stderr)
+    print(f"{'═' * 60}\n", file=sys.stderr)
+
+
+def run_demo(name: str, args) -> None:
+    """Send one of the built-in demo scenes to Blender. Patches PLANET at runtime for space demos."""
+    if name not in DEMOS:
+        print(f"Error: unknown demo {name!r}. Available: {', '.join(sorted(DEMOS))}", file=sys.stderr)
+        sys.exit(1)
+
+    cfg = DEMOS[name]
+    scene_path = Path(cfg["scene"])
+    if not scene_path.exists():
+        print(f"Error: demo scene not found: {scene_path}", file=sys.stderr)
+        sys.exit(1)
+
+    _print_mission_brief(name, cfg)
+
+    script = scene_path.read_text(encoding="utf-8")
+
+    # Patch PLANET constant for space_metaverse variants — no file edit, in-memory only
+    if cfg["planet"]:
+        import re  # noqa: PLC0415 — local import, only used by demo path
+        script = re.sub(
+            r'^PLANET\s*=\s*"[^"]*"',
+            f'PLANET = "{cfg["planet"]}"',
+            script,
+            count=1,
+            flags=re.MULTILINE,
+        )
+
+    scene_before = _snapshot(args.host, args.port) if args.diff else None
+
+    if args.iterate:
+        script = _execute_with_iterate(script, args)
+    else:
+        _send(script, args.host, args.port)
+
+    if scene_before is not None:
+        scene_after = _snapshot(args.host, args.port)
+        if scene_after is not None:
+            _print_scene_diff(scene_before, scene_after)
+
+    if args.preview:
+        _render_preview(args.host, args.port)
+
+
 # ── watch pipeline ────────────────────────────────────────────────────────────
 
 def run_watch(path: str, args) -> None:
@@ -721,6 +791,8 @@ def main():
     input_group.add_argument("--watch", metavar="FILE", help="Prompt text file to watch; regenerate on each save")
     input_group.add_argument("--exec", dest="exec_path", metavar="FILE",
                               help="Execute a .py file in Blender as-is (no Claude call); requires running BlenderMCP")
+    input_group.add_argument("--demo", metavar="NAME",
+                              help="Run a built-in Space Metaverse demo scene (list: --list-demos)")
 
     parser.add_argument(
         "--model",
@@ -767,6 +839,10 @@ def main():
         help="Print all available styles (built-in + --theme + --theme-url) and exit",
     )
     parser.add_argument(
+        "--list-demos", action="store_true",
+        help="Print all built-in demo scenes with mission-brief lines and exit",
+    )
+    parser.add_argument(
         "--rate", type=int, metavar="N", default=None,
         help="Rating 1-5 for the last generation; appended to --history JSONL as {rating: N} "
              "(requires --history; enables the SkillOpt training-data flywheel)",
@@ -798,8 +874,8 @@ def main():
 
     args = parser.parse_args()
 
-    if args.exec_path:
-        args.send = True  # --exec is meaningless without sending; must precede --send guards
+    if args.exec_path or args.demo:
+        args.send = True  # --exec/--demo are meaningless without sending; must precede --send guards
 
     if args.iterate and not args.send:
         parser.error("--iterate requires --send")
@@ -822,6 +898,14 @@ def main():
             print(f"  {name:<12}  {preview}")
         return
 
+    if args.list_demos:
+        print("Available Space Metaverse demos (each requires --send + running BlenderMCP):\n")
+        for name in sorted(DEMOS):
+            cfg = DEMOS[name]
+            print(f"  {name:<12}  {cfg['brief']}")
+            print(f"  {'':<12}  scene: {cfg['scene']}\n")
+        return
+
     if args.rate is not None:
         if not 1 <= args.rate <= 5:
             parser.error(f"--rate must be 1-5, got {args.rate}")
@@ -831,10 +915,13 @@ def main():
     if args.preset and args.preset not in PRESETS:
         parser.error(f"--preset {args.preset!r} not in available styles: {', '.join(PRESETS)}")
 
-    if not (args.prompt or args.batch or args.watch or args.exec_path):
-        parser.error("one of the arguments prompt --batch --watch --exec is required")
+    if not (args.prompt or args.batch or args.watch or args.exec_path or args.demo):
+        parser.error("one of the arguments prompt --batch --watch --exec --demo is required")
 
-    if args.exec_path:
+    if args.demo:
+        run_demo(args.demo, args)
+        mode, target = "demo", args.demo
+    elif args.exec_path:
         run_exec(args.exec_path, args)
         mode, target = "exec", args.exec_path
     elif args.watch:

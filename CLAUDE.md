@@ -34,9 +34,11 @@ python blender_gen.py "city" --theme-url https://gist.../themes.json --preset no
 python blender_gen.py "tree" --retry 3                                    # retry on flaky network
 python blender_gen.py --list-presets                                      # discover styles
 python blender_gen.py "spiral" --history log.jsonl --rate 5               # feed flywheel
+python blender_gen.py --list-demos                                        # Space Metaverse catalog
+python blender_gen.py --demo earth --preview                              # one-liner demo
 ```
 
-## Flags (v0.16)
+## Flags (v0.17)
 | Flag | Effect |
 |------|--------|
 | `--send` | Execute script in running Blender via MCP socket |
@@ -67,6 +69,8 @@ python blender_gen.py "spiral" --history log.jsonl --rate 5               # feed
 | `--retry N` | Retry API call on transient errors (connection/timeout/429/5xx) with exponential backoff |
 | `--list-presets` | Print all available styles (built-in + `--theme` + `--theme-url`) and exit |
 | `--rate N` | Attach quality score 1-5 to `--history` record (SkillOpt training-corpus signal) |
+| `--demo NAME` | Run built-in Space Metaverse demo (`earth`/`moon`/`mars`/`cyberpunk`); auto-enables `--send` |
+| `--list-demos` | Print the demo catalog with KafCade mission-brief lines and exit |
 
 ## Files
 - `blender_gen.py` — main CLI, entry point
