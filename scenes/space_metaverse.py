@@ -35,7 +35,9 @@ SHOW_CLIMATE = True         # Copernicus-style overlay
 SHOW_MARKERS = True         # Galileo lat/lon ground markers
 SHOW_GALILEO = True         # Galileo PRN constellation (24 satellites in orbit)
 SHOW_ORBITS = True          # Galileo orbit-path traces (one curve per plane)
+SHOW_CITIES = True          # extruded blocks at GEO_MARKERS — cityscape proxy
 SHOW_NIGHT = True           # translucent night-hemisphere overlay (UTC-driven)
+SHOW_ATMOSPHERE = True      # World shader Sky Texture (Nishita) for Earth
 USE_REAL_SUN = True         # rotate sun azimuth by subsolar longitude (current UTC)
 ANIMATE = False             # if True: render a PNG sequence of one full sun rotation
 ANIM_FRAMES = 60            # one full rotation over ANIM_FRAMES frames
@@ -242,6 +244,29 @@ def add_galileo_orbits(scale: float) -> None:
         obj.data.materials.append(mat)
 
 
+def add_city_blocks(scale: float) -> None:
+    """Tiny extruded blocks at each GEO_MARKER (cityscape proxy).
+    Skips Equator-Null (reference marker, no real city). Deterministic seed."""
+    mat = make_material("city_block", (0.85, 0.92, 1.0, 1.0), emission=2.5)
+    random.seed(99)
+    for label, lat, lon in GEO_MARKERS:
+        if label == "Equator-Null":
+            continue
+        x, y = latlon_to_xy(lat, lon, scale)
+        n_blocks = random.randint(3, 5)
+        for k in range(n_blocks):
+            height = random.uniform(0.8, 2.4)
+            jx = (random.random() - 0.5) * 1.4
+            jy = (random.random() - 0.5) * 1.4
+            bpy.ops.mesh.primitive_cube_add(
+                size=0.4, location=(x + jx, y + jy, 0.9 + height / 2),
+            )
+            cube = bpy.context.object
+            cube.scale.z = height
+            cube.name = f"CITY_{label}_{k:02d}"
+            cube.data.materials.append(mat)
+
+
 def add_night_overlay(scale: float) -> None:
     """Translucent dark plane centred on antisolar longitude (180° from subsolar)."""
     sub_lon = subsolar_lon_utc()
@@ -252,6 +277,32 @@ def add_night_overlay(scale: float) -> None:
     night.scale.x = 0.5  # cover one hemisphere width
     night.name = "Night_Hemisphere"
     night.data.materials.append(make_material("night_overlay", (0.02, 0.02, 0.07, 1.0), alpha=0.55))
+
+
+def add_atmosphere() -> None:
+    """Replace World shader with Nishita sky texture — atmospheric scatter proxy.
+    Earth-only. Falls back to solid blue if ShaderNodeTexSky is unavailable on this build."""
+    world = bpy.context.scene.world or bpy.data.worlds.new("World")
+    bpy.context.scene.world = world
+    world.use_nodes = True
+    nt = world.node_tree
+    nt.nodes.clear()
+
+    out = nt.nodes.new("ShaderNodeOutputWorld")
+    bg = nt.nodes.new("ShaderNodeBackground")
+    bg.inputs["Strength"].default_value = 0.6
+
+    try:
+        sky = nt.nodes.new("ShaderNodeTexSky")
+        sky.sky_type = "NISHITA"
+        sky.sun_elevation = math.radians(35)
+        sky.air_density = 1.0
+        nt.links.new(sky.outputs["Color"], bg.inputs["Color"])
+    except (TypeError, RuntimeError):
+        # Older Blender builds — solid deep blue as fallback
+        bg.inputs["Color"].default_value = (0.05, 0.10, 0.25, 1.0)
+
+    nt.links.new(bg.outputs["Background"], out.inputs["Surface"])
 
 
 def add_lighting(cfg: dict) -> None:
@@ -336,8 +387,12 @@ def main() -> None:
         add_galileo_satellites(TERRAIN_SCALE)
     if SHOW_ORBITS and PLANET == "earth":
         add_galileo_orbits(TERRAIN_SCALE)
+    if SHOW_CITIES and PLANET == "earth":
+        add_city_blocks(TERRAIN_SCALE)
     if SHOW_NIGHT and PLANET == "earth":
         add_night_overlay(TERRAIN_SCALE)
+    if SHOW_ATMOSPHERE and PLANET == "earth":
+        add_atmosphere()
     add_lighting(cfg)
     add_camera()
     configure_render()
@@ -360,9 +415,10 @@ def main() -> None:
 
     sats = len(GALILEO_PRNS) if (SHOW_GALILEO and PLANET == "earth") else 0
     orbits = 3 if (SHOW_ORBITS and PLANET == "earth") else 0
+    cities = (len(GEO_MARKERS) - 1) if (SHOW_CITIES and PLANET == "earth") else 0  # -1 for Equator-Null
     print(f"[space_metaverse] planet={PLANET}  session={state['sessions']}  "
           f"markers={len(GEO_MARKERS)}  galileo={sats}  orbits={orbits}  "
-          f"terrain={2**TERRAIN_SUBDIV}x")
+          f"cities={cities}  terrain={2**TERRAIN_SUBDIV}x")
 
 
 main()
