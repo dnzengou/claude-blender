@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.12.0 · 2026-06-09 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.17.0 · 2026-07-19 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -117,10 +117,38 @@ Input modes
 - [x] `themes_example.json`: 3 demo styles (`vaporwave`, `noir`, `solarpunk`)
 - [x] `scenes/space_metaverse.py` — `add_galileo_orbits()`: one POLY curve per orbital plane, 60-sample mean-anomaly sweep, **wrap-aware** (splits curve at lon=±180° boundary so the trace doesn't cross the equirectangular map); bevelled cyan emissive; `SHOW_ORBITS` flag, Earth-only gate
 
-### v0.13 — Next 🔲
-- [ ] `--save-state FILE`: persist `args` namespace + last prompt to a `.jsonl` rerun log
-- [ ] `scenes/space_metaverse.py` extension: rotating GIF export (single command renders animation of one Galileo orbit)
-- [ ] `--theme-url URL`: download a JSON theme over HTTPS (stdlib `urllib`), cache locally
+### v0.13 — Shipped ✅ (dual-niche)
+- [x] `--save-state FILE`: append JSONL record of each CLI invocation (mode, target, non-default args); replay-ready; cache-safe (no API impact)
+- [x] `scenes/space_metaverse.py` — `ANIMATE` mode: `keyframe_sun_rotation()` (linear-interp keyframes, seamless loop) + `render_animation()` (PNG sequence to `~/space_metaverse_frames/`); single Galileo-orbit period; optional `ffmpeg -i frame_%04d.png out.mp4` post-processing
+- [x] No GIF dependency (Pillow/imageio): bpy-native PNG sequence keeps the pure-stdlib + bpy-only invariant intact
+
+### v0.14 — Shipped ✅ (dual-niche, 4th consecutive)
+- [x] `--theme-url URL`: fetch JSON theme over http(s); scheme allowlist (rejects `file://` et al.); SHA256-hashed cache at `~/.blender_gen_themes/<16hex>.json`; 10-second timeout; User-Agent header; reuses `load_theme_file` after download
+- [x] `scenes/space_metaverse.py` → `add_city_blocks()`: 3-5 jittered emissive cubes per GEO_MARKER (skipping Equator-Null); deterministic random seed; `SHOW_CITIES` flag, Earth-only; ~30 blocks total
+
+### v0.15 — Shipped ✅ (dual-niche, 5th consecutive)
+- [x] `--retry N`: API-call retry with exponential backoff (1s/2s/4s/8s..., capped at 30s); transient = `APIConnectionError`/`APITimeoutError`/`RateLimitError`/`InternalServerError`; permanent = 4xx (raised); legacy `retries=0` = single attempt
+- [x] `scenes/space_metaverse.py` → `add_atmosphere()`: World shader replaced with Nishita Sky Texture (`ShaderNodeTexSky`); graceful fallback to solid deep-blue on older Blender builds without that node; `SHOW_ATMOSPHERE` flag, Earth-only
+- [x] Self-tested retry: 2 transient errors → success on 3rd attempt; persistent error → raised after retries+1 attempts; `getattr` fallback to OSError/TimeoutError if SDK exception classes absent (forward-compat)
+
+### v0.16 — Shipped ✅ (production-readiness + moat activation)
+- [x] **Windows `--help` fix**: replaced Unicode `→` / `≤` in argparse help strings + description with ASCII; added UTF-8 `reconfigure()` on stdout/stderr — help now runs on cp1252 consoles without traceback (was a first-touch UX crash for Windows users)
+- [x] `--list-presets`: prints all available styles (built-in + `--theme` + `--theme-url`) with truncated token previews and exits; mutually-exclusive input group loosened to `required=False` + manual guard so `--list-presets` works standalone
+- [x] `--rate 1..5`: user quality score attached to `--history` JSONL record; requires `--history` (validated); rating field is optional in the record (unrated entries stay compact) — **completes the SkillOpt flywheel**: prompt → script → rating → labeled training corpus over time
+- [x] `_log_history` extended with `rating: int | None` param; call sites in `run_single` + `run_batch` both pass `args.rate`
+
+### v0.17 — Shipped ✅ (user demo · Space Metaverse value prop)
+- [x] `--demo NAME`: one-liner user demo — 4 built-in scenes covering the Space Metaverse master blueprint's KafCade hierarchy (BODY level: earth/moon/mars via `scenes/space_metaverse.py`; REGION level: cyberpunk via `scenes/cyberpunk_city.py`)
+- [x] `--list-demos`: catalog with KafCade mission-brief lines (`UNIVERSE -> GALAXY SOL -> SYSTEM 3 -> BODY TERRA` etc.), CLI echo of the Kimi Space Metaverse HUD
+- [x] `_print_mission_brief()`: in-terminal UX moment before every demo send — inspired by the Kimi web build's loading-screen UX
+- [x] In-memory `PLANET` constant patch for space demos — single-line regex substitution, disk file unchanged, planet variants without duplication
+- [x] Auto-enables `--send` before `--send` guards (same pattern as `--exec`); composable with `--diff` / `--preview` / `--iterate`
+
+### v0.18 — Next 🔲
+- [ ] `--rate-limit USD/min`: throttle batch calls to stay under a per-minute cost ceiling
+- [ ] `--corpus-stats FILE`: rating distribution + top prompts + model-vs-rating pivot from `--history`
+- [ ] `--demo mission-control`: multi-agent AI-collaborative Mission Control demo (Space Metaverse §9.2 use case)
+- [ ] `scenes/space_metaverse.py` extension: animate one Galileo PRN per plane around its orbit
 
 ---
 
@@ -152,6 +180,7 @@ add_flag(NAME, EFFECT):
 - graceful degradation on any socket/file failure (warn + continue, never crash)
 - no hardcoded secrets · `ANTHROPIC_API_KEY` is the only auth surface
 - `shell=True` forbidden when stdlib has a native API (e.g. `os.startfile`)
+- network input (URL flags) validated against a scheme allowlist before any I/O (cf. `fetch_theme_url` v0.14)
 
 **Mutation history:**
 | Epoch | Diversity injected | Trigger |
@@ -164,6 +193,59 @@ add_flag(NAME, EFFECT):
 | v0.10 | `--cost-budget` + `--explain` + space_metaverse Galileo/night extensions (**dual niche**) | EvoMetaClaw simultaneous content+CLI evolution — recipe absorbs both axes in one epoch |
 | v0.11 | `--exec FILE` (CLI flag, exec niche) | User asked to "execute space metaverse" → run_exec pipeline gap exposed; mutual-exclusive input mode added |
 | v0.12 | `--theme FILE` + Galileo orbit curves (**dual niche**) | EvoMetaClaw paired evolution: extend PRESETS surface area (CLI) + complete Galileo viz (content); wrap-aware curve algorithm new in toolkit |
+| v0.13 | `--save-state FILE` + space_metaverse ANIMATE (**dual niche**) | Recurring dual-niche pattern; replay log addresses reproducibility gap; PNG sequence avoids GIF native dep (ARM-safe) |
+| v0.14 | `--theme-url URL` + city skyline blocks (**dual niche, 4th**) | EvoMetaClaw ESS converging on dual-niche; first network surface (urllib), gated by scheme allowlist → security invariant intact |
+| v0.15 | `--retry N` + atmospheric Sky Texture (**dual niche, 5th**) | EvoMetaClaw ESS locked at dual-niche cadence; first resilience flag complements existing `--iterate`; first World-shader content mutation |
+| v0.16 | Windows help fix + `--list-presets` + `--rate` (**production-readiness + moat activation**) | User E-audit exposed first-touch help crash on Windows; `--rate` closes the SkillOpt flywheel (labeled corpus over time) — strategic differentiator, not a registry-copyable feature |
+| v0.17 | `--demo NAME` + `--list-demos` (**user demo · value-prop showcase**) | External input: Space Metaverse master blueprint (2026-07-17) + Kimi cyberpunk vertical-slice; `--demo` collapses 5-flag composition into a single command that maps onto the blueprint's KafCade hierarchy — commercial low-hanging fruit for user onboarding |
+
+---
+
+## Strategic Moat (EvoMetaClaw / SkillOpt)
+
+A registry (themes, presets, scenes) is trivially copyable — anyone can fork `themes_example.json` or `scenes/*.py` and paste them into their own tool. The competitive moat is not in the assets; it is in the **self-evolving loop over accumulated trajectory data**.
+
+**The flywheel (shipped v0.16):**
+
+```
+user prompt  →  Claude generation  →  bpy script  →  runs / edits / user rates
+     ↑                                                              │
+     │                                                              ▼
+     └──────  --auto-model reroutes    ←── --history + --rate JSONL corpus
+              --preset expands              (labelled prompt-script-rating triples)
+              --explain enriches            ↓
+              --theme / --theme-url         (offline analysis: which prompts get 5-star
+                                             results with which model + preset + theme;
+                                             which fail; auto-curate presets over time)
+```
+
+**Why this is defensible:**
+1. **Data compounds locally**: each user's `--history` file is a private, labelled dataset of *their* domain (their scenes, their vocabulary, their taste). Not copyable — it belongs to them.
+2. **Preset auto-curation** (v0.17 roadmap `--corpus-stats`): after N rated runs, the tool can propose theme mutations (e.g. "your 5-star cyberpunk generations differ from the built-in cyberpunk preset by these tokens — save as `cyberpunk_v2`?"). That's SkillOpt applied to a preset.
+3. **Model routing improves with data**: `--auto-model` is currently a static heuristic (edit-verb + word-count). With a rated corpus, it can be a *learned* router — send prompts to the cheapest model that produced ≥4-star results on similar prompts.
+4. **Every session mutates the Workflow Genome**: the mutation-history table above records what worked and what failed across 12+ epochs. That is a live evolutionary record — the EvoMetaClaw ESS the project has converged on. Copying the repo copies the artifacts; it does not copy the paradigm.
+
+**Rebuild cost for a competitor:** entire training paradigm + accumulated trajectory data across multiple domains + the recipe extraction. High.
+
+### Space Metaverse master blueprint — what claude-blender delivers today
+
+The Space Metaverse master blueprint (v1.0 · 2026-07-17) defines a full stack: Rust+Bevy+WebGPU client, Redpanda world bus, S2-cell parcels, EvoForge trajectory training. `claude-blender` is a **content-generation and demo-authoring wedge** in that stack — the Blender-side of the "digital-twin Earth + orbital layer" pipeline.
+
+| Blueprint element | Delivered by claude-blender v0.17 | Notes |
+|---|---|---|
+| **KafCade BODY level** (Earth/Moon/Mars) | ✅ `--demo earth/moon/mars` | `scenes/space_metaverse.py` — 24-sat Galileo constellation, Copernicus climate overlay proxy, atmospheric Sky Texture, night hemisphere |
+| **KafCade REGION level** | ✅ `--demo cyberpunk` | `scenes/cyberpunk_city.py` — S2-cell-equivalent city grid |
+| **Trajectory capture (agent.traj)** | ✅ `--history` + `--rate` | JSONL corpus of `{prompt, script, rating}` — SkillOpt training feed |
+| **KafCa streaming discipline** | ✅ `--save-state` + `--history` | Two append-mode JSONL streams; audit path per E command |
+| **Content styling** | ✅ `--preset` + `--theme` + `--theme-url` | Local + network-loaded presets, scheme-allowlist validated |
+| **Cost/quality gate** | ✅ `--cost` + `--cost-budget` + `--dry-run` + `--auto-model` | RRSS-`So` (Solidify) cost-side |
+| **Resilience** | ✅ `--retry` + `--iterate` | RRSS-`Rb` (Robustify) — API-side + Blender-side backoff |
+| **Adoption (ARM-A)** | ✅ `--list-demos` + `--list-presets` + `--demo NAME` | Discovery UX + one-liner onboarding |
+| ***Not yet***: Rust/Bevy client | 🔲 | Blueprint §5 — separate repo when it lands |
+| ***Not yet***: On-chain economy | 🔲 | Blueprint §7 — Blender-side previews of ownable parcels planned for v0.18 |
+| ***Not yet***: Mission Control multi-agent | 🔲 | Blueprint §9.2 — `--demo mission-control` in v0.18 roadmap |
+
+**Positioning:** claude-blender is the *content-forge* upstream of the world-server + client — where scenes and skills are authored, rated, and versioned before shipping. Every user session here accretes into the same trajectory corpus the blueprint's EvoForge consumes downstream.
 
 ---
 
@@ -177,6 +259,80 @@ add_flag(NAME, EFFECT):
 ---
 
 ## Changelog
+
+### v0.17.0 — 2026-07-19
+- **User demo shipped** — collapses the Space Metaverse value prop into `python blender_gen.py --demo earth --preview`
+- `DEMOS` module-level registry (4 entries) — `{name: {scene, planet, brief}}` shape; each maps to a KafCade mission-brief line inspired by the Kimi vertical-slice HUD
+- `run_demo(name, args)`:
+  - Reads scene file from disk
+  - For space demos (`earth`/`moon`/`mars`): in-memory regex substitution of `PLANET` constant → three planet variants from a single scene file, disk unchanged
+  - Prints mission-brief header (`SPACE METAVERSE · DEMO: NAME` + KafCade line + scene path)
+  - Sends to Blender via `_send` or `_execute_with_iterate` (composable with `--iterate`)
+  - Full downstream integration: `--diff` / `--preview` / `--save-state` all work
+- `--list-demos`: catalog output with mission-brief lines + scene paths; sits next to `--list-presets` (same UX shape)
+- Auto-enables `--send` before `--send` guards (same pattern as `--exec` gained in v0.11)
+- Mutually-exclusive input group extended to 5 modes: `prompt` / `--batch` / `--watch` / `--exec` / `--demo`
+- Blueprint gained **Space Metaverse master blueprint** mapping — explicit table of what claude-blender delivers today vs the full-stack roadmap
+- v0.18 roadmap seeds: `--rate-limit USD/min`, `--corpus-stats`, `--demo mission-control`, animated PRN
+
+### v0.16.0 — 2026-06-13
+- **Production-readiness fix (Windows first-touch UX)**: `--help` crashed with `UnicodeEncodeError` on cp1252 consoles because argparse tried to emit `→` / `≤` in help strings. Two changes:
+  1. Replaced Unicode in argparse `description=` and `--auto-model` `help=` with ASCII (`->` / `<=`)
+  2. `sys.stdout.reconfigure(encoding="utf-8")` and same for stderr at module load — defensive `getattr` + try/except so it's a no-op on non-supporting streams
+- `--list-presets`:
+  - Prints sorted `PRESETS` (after `--theme` / `--theme-url` merge) with 80-char preview per style, exits 0
+  - Mutually-exclusive input group loosened to `required=False`; manual guard before dispatch ensures prompt/`--batch`/`--watch`/`--exec` still required for non-`--list-presets` runs
+- `--rate 1..5` (**SkillOpt flywheel closer**):
+  - Attaches user quality score to the `--history` JSONL record
+  - Requires `--history` (validated with clear error message)
+  - `_log_history` gained optional `rating: int | None`; unrated entries omit the field to keep records compact
+  - Combined with existing `--history` and `--save-state`, produces labelled prompt-script-rating triples — the local corpus that seeds any future fine-tune or auto-router
+- Blueprint gained explicit **Strategic Moat** section documenting the EvoMetaClaw rationale: assets are copyable, the self-evolving loop over accumulated trajectory data is not
+- v0.17 roadmap: `--rate-limit USD/min`, `--corpus-stats FILE`, animated PRN ground-track
+
+### v0.15.0 — 2026-06-12
+- `--retry N`:
+  - `_transient_errors()`: resolves SDK exception classes lazily via `getattr` with stdlib fallbacks (forward-compat with SDK changes)
+  - `_call_with_retry(fn, retries)`: at most `retries+1` total attempts; sleep `min(2**attempt, 30)` seconds between attempts; retries=0 → single direct call (no wrapper overhead)
+  - Wraps both `client.messages.create` and `client.messages.stream` paths uniformly via a callable
+  - Self-tested: 2 transient + recover → success at attempt 3; persistent → raised after `retries+1`
+  - Default `retry=0` so cold-runs are unchanged
+  - Wired through `run_single` and `run_batch` via `args.retry`
+- `scenes/space_metaverse.py` → `add_atmosphere()`:
+  - `bpy.context.scene.world` replaced with Background+TexSky pipeline; Nishita model, `sun_elevation=35°`, `air_density=1.0`
+  - Graceful fallback to solid `(0.05, 0.10, 0.25, 1.0)` deep blue if `ShaderNodeTexSky` raises (older Blender builds)
+  - `SHOW_ATMOSPHERE` flag, Earth-only gate; first World-shader mutation in the scene
+- v0.16 roadmap: `--list-presets`, `--rate-limit USD/min`, animated PRN ground-track
+
+### v0.14.0 — 2026-06-11
+- `--theme-url URL`:
+  - `fetch_theme_url()` next to `load_theme_file`; same exit-on-error pattern
+  - Scheme allowlist `{http, https}` — `file://`, `data://`, `ftp://` etc. rejected before any I/O (verified: `file:///etc/passwd` → clean error, no read)
+  - SHA256-of-URL truncated to 16 hex chars → cache filename; distinct URLs (incl. query-string variants) get distinct cache entries
+  - Cache dir: `~/.blender_gen_themes/` (created on demand)
+  - `urllib.request` with 10-second timeout + User-Agent `claude-blender/0.14`; catches `URLError`, `TimeoutError`, `OSError`
+  - After download, reuses `load_theme_file` for parse + shape validation (single validation path)
+  - Wired in `main()` after `--theme`; URL themes override file themes on key collision
+- `scenes/space_metaverse.py` → `add_city_blocks()`:
+  - 3-5 jittered emissive cubes per GEO_MARKER (skip `Equator-Null`); `random.seed(99)` for determinism
+  - White-cyan emissive material, Z-scaled cube height 0.8-2.4
+  - `SHOW_CITIES` flag, Earth-only gate; ~30 blocks for 5 cities
+  - Session report now logs `cities=N`
+- v0.15 roadmap: `--retry N` (API-call retry, distinct from `--iterate`), `--list-presets`, atmospheric scatter halo for Earth
+
+### v0.13.0 — 2026-06-10
+- `--save-state FILE`:
+  - `_save_state()` helper next to `_log_history`; same OSError-tolerant append-mode pattern
+  - Records `{ts, mode, target, args}` where `args` is `vars(args)` filtered of None/False/0/"" + `save_state` key itself
+  - Mode ∈ `{single, batch, exec, watch}`; target is the prompt / batch file / exec file / watch file
+  - Fires once per `main()` invocation after the dispatched run completes
+  - Self-tested: dry-run + auto-model + save-state → record contains `mode=single, target='spinning torus', args=['auto_model','dry_run','host','model','port','prompt']`
+- `scenes/space_metaverse.py` → `ANIMATE` mode:
+  - `keyframe_sun_rotation()`: keyframes Z-rotation at frame 1 and frame ANIM_FRAMES+1 → seamless loop; switches all keyframe interpolation to LINEAR for steady spin
+  - `render_animation()`: iterates `[frame_start, frame_end]`, writes `frame_NNNN.png` to `~/space_metaverse_frames/`
+  - `ANIMATE`, `ANIM_FRAMES=60`, `ANIM_DIR` flags at module top; OFF by default to keep cold-run cheap
+  - Optional post-step: `ffmpeg -i ~/space_metaverse_frames/frame_%04d.png out.mp4` (external; bpy itself doesn't ship video encoder on all platforms)
+- v0.14 roadmap: `--theme-url URL`, `--retry N`, space_metaverse city skyline blocks
 
 ### v0.12.0 — 2026-06-09
 - `--theme FILE`:
@@ -279,4 +435,4 @@ add_flag(NAME, EFFECT):
 
 ---
 
-*claude-blender Blueprint v0.12.0 · 2026-06-09 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
+*claude-blender Blueprint v0.17.0 · 2026-07-19 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)*
