@@ -37,6 +37,7 @@ SHOW_GALILEO = True         # Galileo PRN constellation (24 satellites in orbit)
 SHOW_ORBITS = True          # Galileo orbit-path traces (one curve per plane)
 SHOW_CITIES = True          # extruded blocks at GEO_MARKERS — cityscape proxy
 SHOW_NIGHT = True           # translucent night-hemisphere overlay (UTC-driven)
+SHOW_ATMOSPHERE = True      # World shader Sky Texture (Nishita) for Earth
 USE_REAL_SUN = True         # rotate sun azimuth by subsolar longitude (current UTC)
 ANIMATE = False             # if True: render a PNG sequence of one full sun rotation
 ANIM_FRAMES = 60            # one full rotation over ANIM_FRAMES frames
@@ -278,6 +279,32 @@ def add_night_overlay(scale: float) -> None:
     night.data.materials.append(make_material("night_overlay", (0.02, 0.02, 0.07, 1.0), alpha=0.55))
 
 
+def add_atmosphere() -> None:
+    """Replace World shader with Nishita sky texture — atmospheric scatter proxy.
+    Earth-only. Falls back to solid blue if ShaderNodeTexSky is unavailable on this build."""
+    world = bpy.context.scene.world or bpy.data.worlds.new("World")
+    bpy.context.scene.world = world
+    world.use_nodes = True
+    nt = world.node_tree
+    nt.nodes.clear()
+
+    out = nt.nodes.new("ShaderNodeOutputWorld")
+    bg = nt.nodes.new("ShaderNodeBackground")
+    bg.inputs["Strength"].default_value = 0.6
+
+    try:
+        sky = nt.nodes.new("ShaderNodeTexSky")
+        sky.sky_type = "NISHITA"
+        sky.sun_elevation = math.radians(35)
+        sky.air_density = 1.0
+        nt.links.new(sky.outputs["Color"], bg.inputs["Color"])
+    except (TypeError, RuntimeError):
+        # Older Blender builds — solid deep blue as fallback
+        bg.inputs["Color"].default_value = (0.05, 0.10, 0.25, 1.0)
+
+    nt.links.new(bg.outputs["Background"], out.inputs["Surface"])
+
+
 def add_lighting(cfg: dict) -> None:
     bpy.ops.object.light_add(type="SUN", location=(20, -20, 25))
     sun = bpy.context.object
@@ -364,6 +391,8 @@ def main() -> None:
         add_city_blocks(TERRAIN_SCALE)
     if SHOW_NIGHT and PLANET == "earth":
         add_night_overlay(TERRAIN_SCALE)
+    if SHOW_ATMOSPHERE and PLANET == "earth":
+        add_atmosphere()
     add_lighting(cfg)
     add_camera()
     configure_render()
