@@ -1,0 +1,33 @@
+# claude-blender
+
+> Single-file Python CLI that turns natural language into runnable Blender (`bpy`) scripts via the Claude API, with optional live execution over the BlenderMCP socket. Pure Python, ARM-compatible, prompt-cached, flywheel-ready.
+
+claude-blender is a commercial-grade bridge between Claude and Blender 4.x. It wraps the Anthropic SDK, caches the system prompt, and ships generated code to a running Blender over MCP in one command. It includes an EvoSkillOps flywheel for rating generations and exporting a fine-tune-ready corpus, a Space Metaverse demo catalog (Earth/Moon/Mars + cyberpunk) built for geospatial storytelling, and theme packs loaded from JSON files or HTTPS URLs.
+
+## Docs
+
+- [README](./README.md): landing page, feature matrix, quickstart, roadmap
+- [CLAUDE.md](./CLAUDE.md): full flag reference and project context
+- [AGENTS.md](./AGENTS.md): agent conventions — how coding agents work in this repo
+- [Blueprint](./claude_blender_Blueprint.md): architecture, roadmap, version history
+- [Prompt library](./prompts/mcp_prompts.md): six battle-tested BlenderMCP prompts
+
+## Code
+
+- [blender_gen.py](./blender_gen.py): the whole CLI — argparse surface, Claude call, MCP socket, flywheel
+- [requirements.txt](./requirements.txt): one dependency — `anthropic`
+- [scenes/space_metaverse.py](./scenes/space_metaverse.py): geospatial Earth/Moon/Mars reference scene with Galileo markers, orbit curves, Copernicus climate overlay
+- [scenes/cyberpunk_city.py](./scenes/cyberpunk_city.py): neon grid reference scene
+- [themes_example.json](./themes_example.json): sample `--theme` payload (vaporwave/noir/solarpunk)
+
+## Manifests
+
+- [.well-known/agents.json](./.well-known/agents.json): machine-readable capability manifest
+- [CITATION.cff](./CITATION.cff): machine-readable citation metadata
+- [pyproject.toml](./pyproject.toml): PyPI packaging metadata
+
+## Optional
+
+- [llms-full.txt](./llms-full.txt): full concatenated context for LLM ingestion
+- [example_batch.txt](./example_batch.txt): sample batch prompts
+- [claude-blender-prompts.txt](./claude-blender-prompts.txt): curated reference prompts + external links
