@@ -9,6 +9,13 @@ claude-blender is a commercial-grade bridge between Claude and Blender 4.x. It w
 - [README](./README.md): landing page, feature matrix, quickstart, roadmap
 - [CLAUDE.md](./CLAUDE.md): full flag reference and project context
 - [AGENTS.md](./AGENTS.md): agent conventions — how coding agents work in this repo
+- [FAQ.md](./FAQ.md): citable Q&A for LLM search grounding
+- [TRUST.md](./TRUST.md): verifiable-facts manifest (white-hat GEO)
+- [INTEGRATE.md](./INTEGRATE.md): end-user integrations (local, PyPI, Blender, CI, platforms, troubleshooting)
+- [STRATEGY.md](./STRATEGY.md): EvoForge → EvoSkillOps → EvoMetaClaw moat argument
+- [CHANGELOG.md](./CHANGELOG.md): per-release additions and changes
+- [CONTRIBUTING.md](./CONTRIBUTING.md): how to add a flag, verify, PR etiquette
+- [SECURITY.md](./SECURITY.md): threat model and reporting workflow
 - [Blueprint](./claude_blender_Blueprint.md): architecture, roadmap, version history
 - [Prompt library](./prompts/mcp_prompts.md): six battle-tested BlenderMCP prompts
 
@@ -23,6 +30,7 @@ claude-blender is a commercial-grade bridge between Claude and Blender 4.x. It w
 ## Manifests
 
 - [.well-known/agents.json](./.well-known/agents.json): machine-readable capability manifest
+- [.well-known/mcp.json](./.well-known/mcp.json): BlenderMCP compatibility manifest
 - [CITATION.cff](./CITATION.cff): machine-readable citation metadata
 - [pyproject.toml](./pyproject.toml): PyPI packaging metadata
 

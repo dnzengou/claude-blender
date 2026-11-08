@@ -58,6 +58,9 @@ for _stream in (sys.stdout, sys.stderr):
         except Exception:  # noqa: BLE001 — defensive: never crash on stream config
             pass
 
+__version__ = "0.19.0"
+USER_AGENT = f"claude-blender/{__version__}"
+
 MCP_TIMEOUT = 10  # seconds
 
 SYSTEM_PROMPT = """You are a Blender Python scripting expert. Output complete, runnable bpy scripts only.
@@ -355,13 +358,8 @@ def _read_history_jsonl(path: str) -> list[dict]:
     return records
 
 
-def skillops_report(path: str) -> None:
-    """Print aggregate EvoSkillOps stats from a history JSONL."""
-    records = _read_history_jsonl(path)
-    if not records:
-        print(f"EvoSkillOps: {path} is empty — nothing to report.", file=sys.stderr)
-        return
-
+def _skillops_stats(records: list[dict]) -> dict:
+    """Pure aggregation of history records into EvoSkillOps stats."""
     total = len(records)
     rated = [r for r in records if isinstance(r.get("rating"), int)]
     mean_rating = sum(r["rating"] for r in rated) / len(rated) if rated else None
@@ -372,20 +370,48 @@ def skillops_report(path: str) -> None:
         model_counts[m] = model_counts.get(m, 0) + 1
 
     top = sorted(rated, key=lambda r: r.get("rating", 0), reverse=True)[:5]
+    return {
+        "runs": total,
+        "rated": len(rated),
+        "mean_rating": mean_rating,
+        "model_mix": dict(sorted(model_counts.items(), key=lambda kv: -kv[1])),
+        "top_rated": [
+            {"rating": r.get("rating"), "prompt": r.get("prompt"), "model": r.get("model"), "ts": r.get("ts")}
+            for r in top
+        ],
+    }
 
+
+def skillops_report(path: str, as_json: bool = False) -> None:
+    """Print aggregate EvoSkillOps stats from a history JSONL."""
+    records = _read_history_jsonl(path)
+    if not records:
+        if as_json:
+            print(json.dumps({"path": path, "runs": 0, "rated": 0, "mean_rating": None,
+                              "model_mix": {}, "top_rated": []}))
+        else:
+            print(f"EvoSkillOps: {path} is empty — nothing to report.", file=sys.stderr)
+        return
+
+    stats = _skillops_stats(records)
+    if as_json:
+        print(json.dumps({"path": path, **stats}))
+        return
+
+    total = stats["runs"]
     print(f"EvoSkillOps report — {path}")
     print(f"  runs:         {total}")
-    print(f"  rated:        {len(rated)}  ({100 * len(rated) / total:.0f}%)")
-    if mean_rating is not None:
-        print(f"  mean rating:  {mean_rating:.2f} / 5")
+    print(f"  rated:        {stats['rated']}  ({100 * stats['rated'] / total:.0f}%)")
+    if stats["mean_rating"] is not None:
+        print(f"  mean rating:  {stats['mean_rating']:.2f} / 5")
     print("  model mix:")
-    for m, c in sorted(model_counts.items(), key=lambda kv: -kv[1]):
+    for m, c in stats["model_mix"].items():
         print(f"    {m:<32}  {c:>4}  ({100 * c / total:.0f}%)")
-    if top:
+    if stats["top_rated"]:
         print("  top-rated prompts:")
-        for r in top:
-            prompt_preview = (r.get("prompt") or "")[:72]
-            print(f"    [{r.get('rating')}/5]  {prompt_preview}")
+        for entry in stats["top_rated"]:
+            prompt_preview = (entry.get("prompt") or "")[:72]
+            print(f"    [{entry.get('rating')}/5]  {prompt_preview}")
 
 
 def skillops_export(out_path: str, history_path: str, rate_min: int) -> None:
@@ -549,7 +575,7 @@ def fetch_theme_url(url: str) -> dict:
         return load_theme_file(str(cache_path))
 
     print(f"Fetching theme from {url}...", file=sys.stderr)
-    req = urllib.request.Request(url, headers={"User-Agent": "claude-blender/0.14"})
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
         with urllib.request.urlopen(req, timeout=THEME_URL_TIMEOUT) as resp:  # noqa: S310 - scheme validated above
             data = resp.read()
@@ -863,7 +889,12 @@ def _send(script: str, host: str, port: int) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
+        prog="claude-blender",
         description="Claude -> Blender: natural language to bpy scripts"
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"claude-blender {__version__}",
+        help="Print version and exit",
     )
 
     # Input modes are mutually exclusive but not always required
@@ -963,6 +994,10 @@ def main():
         "--rate-min", dest="rate_min", type=int, default=4, metavar="N",
         help="Minimum rating (1-5) for --skillops-export to include a record (default: 4)",
     )
+    parser.add_argument(
+        "--json", dest="as_json", action="store_true",
+        help="Emit machine-readable JSON (used by --skillops-report)",
+    )
 
     args = parser.parse_args()
 
@@ -984,7 +1019,7 @@ def main():
         PRESETS.update(fetch_theme_url(args.theme_url))
 
     if args.skillops_report:
-        skillops_report(args.skillops_report)
+        skillops_report(args.skillops_report, as_json=args.as_json)
         return
 
     if args.skillops_export:

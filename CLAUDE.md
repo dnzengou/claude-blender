@@ -40,9 +40,11 @@ python blender_gen.py --skillops-report runs.jsonl                        # EvoS
 python blender_gen.py --skillops-export corpus.jsonl --history runs.jsonl --rate-min 4   # fine-tune corpus
 ```
 
-## Flags (v0.18)
+## Flags (v0.19)
 | Flag | Effect |
 |------|--------|
+| `--version` | Print `claude-blender <version>` and exit |
+| `--json` | Emit machine-readable JSON (used by `--skillops-report`) |
 | `--send` | Execute script in running Blender via MCP socket |
 | `--scene` | Fetch live scene state from Blender, inject into Claude prompt |
 | `--stream` | Stream Claude output token-by-token to stdout |
@@ -92,6 +94,15 @@ python blender_gen.py --skillops-export corpus.jsonl --history runs.jsonl --rate
 - `.well-known/agents.json` — self-describing capability manifest
 - `CITATION.cff` — machine-readable citation metadata
 - `SECURITY.md` — vulnerability-reporting policy and threat model
+- `TRUST.md` — verifiable-facts manifest (white-hat GEO)
+- `FAQ.md` — citable Q&A for LLM search tools
+- `INTEGRATE.md` — end-user integration guide
+- `STRATEGY.md` — EvoForge / EvoSkillOps / EvoMetaClaw moat rationale
+- `CONTRIBUTING.md` — contributor guidance and flag-adding workflow
+- `CODE_OF_CONDUCT.md` — Contributor Covenant 2.1
+- `CHANGELOG.md` — root-level per-release change log
+- `.well-known/mcp.json` — BlenderMCP compatibility manifest
+- `templates/agent-detectability/` — reusable kit: AGENTS.md / llms.txt / TRUST.md / FAQ.md / agents.json / CITATION.cff scaffolds for other repos
 
 ## Conventions
 - No native C extensions; stays ARM-compatible

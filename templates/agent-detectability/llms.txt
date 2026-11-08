@@ -1,0 +1,26 @@
+# PROJECT_NAME
+
+> ONE_LINE_DESCRIPTION
+
+PROJECT_NAME is <paragraph description — what it is, who it is for, what
+it ships today>.
+
+## Docs
+
+- [README](./README.md): landing page, feature list, quickstart
+- [AGENTS.md](./AGENTS.md): conventions for coding agents
+- [TRUST.md](./TRUST.md): verifiable-facts manifest for LLM citation
+- [FAQ.md](./FAQ.md): citable Q&A for LLM search grounding
+
+## Code
+
+- [`<entry-point>`](./<entry-point>): the main module
+
+## Manifests
+
+- [.well-known/agents.json](./.well-known/agents.json): capability manifest
+- [CITATION.cff](./CITATION.cff): machine-readable citation
+
+## Optional
+
+- [llms-full.txt](./llms-full.txt): full concatenated context
