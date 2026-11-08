@@ -36,9 +36,11 @@ python blender_gen.py --list-presets                                      # disc
 python blender_gen.py "spiral" --history log.jsonl --rate 5               # feed flywheel
 python blender_gen.py --list-demos                                        # Space Metaverse catalog
 python blender_gen.py --demo earth --preview                              # one-liner demo
+python blender_gen.py --skillops-report runs.jsonl                        # EvoSkillOps aggregate stats
+python blender_gen.py --skillops-export corpus.jsonl --history runs.jsonl --rate-min 4   # fine-tune corpus
 ```
 
-## Flags (v0.17)
+## Flags (v0.18)
 | Flag | Effect |
 |------|--------|
 | `--send` | Execute script in running Blender via MCP socket |
@@ -71,15 +73,25 @@ python blender_gen.py --demo earth --preview                              # one-
 | `--rate N` | Attach quality score 1-5 to `--history` record (SkillOpt training-corpus signal) |
 | `--demo NAME` | Run built-in Space Metaverse demo (`earth`/`moon`/`mars`/`cyberpunk`); auto-enables `--send` |
 | `--list-demos` | Print the demo catalog with KafCade mission-brief lines and exit |
+| `--skillops-report FILE` | Read a `--history` JSONL and print aggregate EvoSkillOps stats (run count, rated%, mean rating, model mix, top-5 prompts); exits after reporting |
+| `--skillops-export OUT` | Emit a fine-tune-ready JSONL of `{prompt, completion}` filtered by `--rate-min` from `--history`; requires `--history`, exits after writing |
+| `--rate-min N` | Minimum rating 1-5 for `--skillops-export` to keep a record (default: 4) |
 
 ## Files
 - `blender_gen.py` — main CLI, entry point
 - `requirements.txt` — single dep: anthropic
+- `pyproject.toml` — PyPI packaging metadata + ruff config (narrow select)
 - `.gitignore` — excludes .env, caches, venvs
 - `.github/workflows/ci.yml` — ruff lint + py_compile on push
 - `scenes/cyberpunk_city.py` — reference scene: cyberpunk city grid
 - `scenes/space_metaverse.py` — reference scene: geospatial persistent 3D world (Earth/Moon/Mars, Galileo markers + orbits, Copernicus climate overlay)
 - `themes_example.json` — sample `--theme` styles (vaporwave/noir/solarpunk)
+- `README.md` — polished landing page (SEO + agent-discoverable)
+- `AGENTS.md` — conventions for coding agents (Codex/Cursor/Claude Code/Aider)
+- `llms.txt` / `llms-full.txt` — LLM-crawler-detectable context (llmstxt.org)
+- `.well-known/agents.json` — self-describing capability manifest
+- `CITATION.cff` — machine-readable citation metadata
+- `SECURITY.md` — vulnerability-reporting policy and threat model
 
 ## Conventions
 - No native C extensions; stays ARM-compatible

@@ -29,6 +29,8 @@ Usage:
     python blender_gen.py "spiral" --history log.jsonl --rate 5       # feed flywheel
     python blender_gen.py --list-demos                                # Space Metaverse catalog
     python blender_gen.py --demo earth --preview                      # one-liner demo
+    python blender_gen.py --skillops-report runs.jsonl                # flywheel aggregate stats
+    python blender_gen.py --skillops-export corpus.jsonl --history runs.jsonl --rate-min 4
 """
 
 import anthropic
@@ -330,6 +332,87 @@ def _print_cost(usage, model: str) -> None:
         print(f"Cost: unknown (no PRICING entry for {model})", file=sys.stderr)
         return
     print(f"Cost: ${cost:.4f}  (model={model})", file=sys.stderr)
+
+
+# ── EvoSkillOps flywheel ──────────────────────────────────────────────────────
+
+def _read_history_jsonl(path: str) -> list[dict]:
+    """Read a history JSONL into a list of records. Skips malformed lines with a warning."""
+    try:
+        raw_lines = Path(path).read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        print(f"Error: cannot read history {path}: {exc}", file=sys.stderr)
+        sys.exit(1)
+    records: list[dict] = []
+    for i, line in enumerate(raw_lines, start=1):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError:
+            print(f"Warning: skipping malformed JSONL at {path}:{i}", file=sys.stderr)
+    return records
+
+
+def skillops_report(path: str) -> None:
+    """Print aggregate EvoSkillOps stats from a history JSONL."""
+    records = _read_history_jsonl(path)
+    if not records:
+        print(f"EvoSkillOps: {path} is empty — nothing to report.", file=sys.stderr)
+        return
+
+    total = len(records)
+    rated = [r for r in records if isinstance(r.get("rating"), int)]
+    mean_rating = sum(r["rating"] for r in rated) / len(rated) if rated else None
+
+    model_counts: dict[str, int] = {}
+    for r in records:
+        m = r.get("model", "unknown")
+        model_counts[m] = model_counts.get(m, 0) + 1
+
+    top = sorted(rated, key=lambda r: r.get("rating", 0), reverse=True)[:5]
+
+    print(f"EvoSkillOps report — {path}")
+    print(f"  runs:         {total}")
+    print(f"  rated:        {len(rated)}  ({100 * len(rated) / total:.0f}%)")
+    if mean_rating is not None:
+        print(f"  mean rating:  {mean_rating:.2f} / 5")
+    print("  model mix:")
+    for m, c in sorted(model_counts.items(), key=lambda kv: -kv[1]):
+        print(f"    {m:<32}  {c:>4}  ({100 * c / total:.0f}%)")
+    if top:
+        print("  top-rated prompts:")
+        for r in top:
+            prompt_preview = (r.get("prompt") or "")[:72]
+            print(f"    [{r.get('rating')}/5]  {prompt_preview}")
+
+
+def skillops_export(out_path: str, history_path: str, rate_min: int) -> None:
+    """Export a fine-tune-ready JSONL of {prompt, completion} pairs filtered by rating.
+    Records without a rating or below the threshold are dropped."""
+    records = _read_history_jsonl(history_path)
+    kept = 0
+    try:
+        with open(out_path, "w", encoding="utf-8") as f:
+            for r in records:
+                rating = r.get("rating")
+                if not isinstance(rating, int) or rating < rate_min:
+                    continue
+                prompt = r.get("prompt")
+                script = r.get("script")
+                if not prompt or not script:
+                    continue
+                f.write(json.dumps({"prompt": prompt, "completion": script}) + "\n")
+                kept += 1
+    except OSError as exc:
+        print(f"Error: cannot write export {out_path}: {exc}", file=sys.stderr)
+        sys.exit(1)
+    print(
+        f"EvoSkillOps export: wrote {kept} record(s) to {out_path} "
+        f"(filtered rating >= {rate_min} from {len(records)} total).",
+        file=sys.stderr,
+    )
 
 
 # ── Claude generation ─────────────────────────────────────────────────────────
@@ -793,6 +876,11 @@ def main():
                               help="Execute a .py file in Blender as-is (no Claude call); requires running BlenderMCP")
     input_group.add_argument("--demo", metavar="NAME",
                               help="Run a built-in Space Metaverse demo scene (list: --list-demos)")
+    input_group.add_argument("--skillops-report", dest="skillops_report", metavar="FILE",
+                              help="Read a --history JSONL and print aggregate EvoSkillOps stats, then exit")
+    input_group.add_argument("--skillops-export", dest="skillops_export", metavar="OUT",
+                              help="Export a fine-tune-ready JSONL of {prompt, completion} from --history "
+                                   "filtered by --rate-min, then exit (requires --history)")
 
     parser.add_argument(
         "--model",
@@ -871,6 +959,10 @@ def main():
         "--explain", action="store_true",
         help="Ask Claude to prepend a '# Design rationale:' comment block to the script",
     )
+    parser.add_argument(
+        "--rate-min", dest="rate_min", type=int, default=4, metavar="N",
+        help="Minimum rating (1-5) for --skillops-export to include a record (default: 4)",
+    )
 
     args = parser.parse_args()
 
@@ -890,6 +982,18 @@ def main():
         PRESETS.update(load_theme_file(args.theme))
     if args.theme_url:
         PRESETS.update(fetch_theme_url(args.theme_url))
+
+    if args.skillops_report:
+        skillops_report(args.skillops_report)
+        return
+
+    if args.skillops_export:
+        if not args.history:
+            parser.error("--skillops-export requires --history (the input JSONL)")
+        if not 1 <= args.rate_min <= 5:
+            parser.error(f"--rate-min must be 1-5, got {args.rate_min}")
+        skillops_export(args.skillops_export, args.history, args.rate_min)
+        return
 
     if args.list_presets:
         for name in sorted(PRESETS):

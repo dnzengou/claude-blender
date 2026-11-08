@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.17.0 · 2026-07-19 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.18.0 · 2026-11-07 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -144,11 +144,18 @@ Input modes
 - [x] In-memory `PLANET` constant patch for space demos — single-line regex substitution, disk file unchanged, planet variants without duplication
 - [x] Auto-enables `--send` before `--send` guards (same pattern as `--exec`); composable with `--diff` / `--preview` / `--iterate`
 
-### v0.18 — Next 🔲
+### v0.18 — Shipped ✅ (EvoSkillOps · Agent-Detectable SEO)
+- [x] `--skillops-report FILE`: aggregate stats from a `--history` JSONL — run count, rated%, mean rating, model mix, top-5 rated prompts; exits after reporting (the EvoSkillOps feedback half of the flywheel)
+- [x] `--skillops-export OUT`: emits a fine-tune-ready `{prompt, completion}` JSONL filtered by `--rate-min` (default 4); requires `--history`; turns rated history into a supervised-training corpus (the EvoSkillOps harvest half)
+- [x] `--rate-min N`: threshold flag used by `--skillops-export`
+- [x] **Agent-detectable SEO surface**: `README.md` rewritten (badges, feature matrix, keywords, roadmap, citation stub), `AGENTS.md` added (Codex/Cursor/Claude Code conventions), `llms.txt` + `llms-full.txt` published (llmstxt.org), `.well-known/agents.json` capability manifest, `CITATION.cff`, `SECURITY.md`
+- [x] `pyproject.toml`: PyPI packaging metadata with rich keywords, classifiers, project URLs, and `claude-blender` / `blender-gen` console entry points; narrows `[tool.ruff.lint] select` to stabilize CI across ruff versions
+
+### v0.19 — Next 🔲
 - [ ] `--rate-limit USD/min`: throttle batch calls to stay under a per-minute cost ceiling
-- [ ] `--corpus-stats FILE`: rating distribution + top prompts + model-vs-rating pivot from `--history`
 - [ ] `--demo mission-control`: multi-agent AI-collaborative Mission Control demo (Space Metaverse §9.2 use case)
 - [ ] `scenes/space_metaverse.py` extension: animate one Galileo PRN per plane around its orbit
+- [ ] `--skillops-corpus-stats`: model-vs-rating pivot + prompt-length-vs-rating correlation over `--history`
 
 ---
 
@@ -259,6 +266,24 @@ The Space Metaverse master blueprint (v1.0 · 2026-07-17) defines a full stack: 
 ---
 
 ## Changelog
+
+### v0.18.0 — 2026-11-07
+- **EvoSkillOps flywheel closed** — v0.16 landed the *rating* half of SkillOpt; v0.18 lands the *feedback* and *harvest* halves so the loop is end-to-end:
+  - `--skillops-report FILE` — reads a `--history` JSONL and prints: run count, `rated / total (pct)`, mean rating (rated-only), model mix sorted by frequency, top-5 rated prompts (72-char preview, `[N/5]` prefix)
+  - `--skillops-export OUT --history IN [--rate-min N]` — streams a fine-tune-ready JSONL where each line is `{"prompt": ..., "completion": ...}`; skips unrated records and anything below `--rate-min` (default 4); `--rate-min` is 1-5 validated
+  - `--rate-min N` default 4 — one-liner winnower for `--skillops-export`
+  - Both flags are new entries in the mutually-exclusive input group and short-circuit with `return` before the single/batch/watch/exec/demo dispatch
+  - `_read_history_jsonl(path)` shared helper — tolerates malformed lines with per-line warning, exits cleanly on missing file
+- **Agent-detectable SEO surface** — ships the full discovery stack:
+  - `README.md` rewritten: hero + badges (python, platform, Claude models, license, agent-ready) + one-liner pitch + feature matrix + EvoSkillOps flywheel section + Space Metaverse section + agent-use section + citation stub + keyword footer
+  - `AGENTS.md` added: Codex/Cursor/Zed convention — project layout, run/verify, coding conventions, how-to-add-a-flag workflow lifted from this Blueprint's Workflow Genome
+  - `llms.txt` + `llms-full.txt`: llmstxt.org index + full-ingest context for LLM crawlers
+  - `.well-known/agents.json`: self-describing capability manifest — 19 capabilities with command examples
+  - `CITATION.cff`: machine-readable citation metadata
+  - `SECURITY.md`: threat model, agent-attack surface, reporting workflow
+  - `pyproject.toml`: PyPI packaging metadata — name, version 0.18.0, rich keyword list, trove classifiers, project URLs, `claude-blender` / `blender-gen` console entry points via `[project.scripts]`; `[tool.ruff.lint] select = ["E4","E7","E9","F"]` pins the rule set so CI stays deterministic across ruff releases
+- Composable with everything: `--history runs.jsonl --rate 5` feeds the log; `--skillops-report runs.jsonl` reads it; `--skillops-export corpus.jsonl --history runs.jsonl --rate-min 4` harvests it
+- v0.19 roadmap seeds: `--rate-limit USD/min`, `--demo mission-control`, PRN animation, `--skillops-corpus-stats` for pivot tables
 
 ### v0.17.0 — 2026-07-19
 - **User demo shipped** — collapses the Space Metaverse value prop into `python blender_gen.py --demo earth --preview`

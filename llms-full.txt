@@ -1,0 +1,107 @@
+# claude-blender — Full Context for LLM Ingestion
+
+This file exists so an LLM crawler or ingestion pipeline can pull the full
+project context in one fetch. For a lighter index with per-document links,
+see `llms.txt`.
+
+## What it is
+
+`claude-blender` is a single-file Python CLI (`blender_gen.py`) that turns
+natural language into runnable Blender Python (`bpy`) scripts via the Claude
+API. It can print, save, stream, batch, hot-reload, and — when BlenderMCP is
+running on `localhost:9876` — ship the generated code straight into a
+running Blender viewport.
+
+The whole tool is one Python file. Its only runtime dependency is the
+`anthropic` SDK. It runs on any CPU architecture (Apple Silicon, Raspberry
+Pi, AWS Graviton, x86) because there are no native extensions anywhere.
+
+## Who it is for
+
+- 3D artists who want Claude as a technical director
+- Researchers who want a reproducible, loggable prompt→scene pipeline
+- Agent builders who need a well-described, machine-readable target repo
+- Teams productizing an AI design loop and needing cost budgets, replay
+  logs, and a training-corpus flywheel out of the box
+
+## Capabilities (user-facing)
+
+- **Live execution** — `--send` pushes scripts into Blender over MCP
+- **Scene round-trip** — `--scene` pulls live Blender state back into the prompt
+- **Streaming** — `--stream` streams Claude output token by token
+- **Batch** — `--batch FILE` generates one script per prompt line
+- **Hot-reload** — `--watch FILE` regenerates and sends on every save
+- **Run as-is** — `--exec FILE` ships a `.py` to Blender with no Claude call
+- **Auto-fix** — `--iterate N` re-prompts Claude on Blender errors
+- **Style presets** — `--preset cyberpunk|nature|abstract|scifi|toon`
+- **Custom themes** — `--theme FILE` and `--theme-url URL` merge JSON
+  `{name: tokens}` into the preset table; URL fetches are scheme-restricted
+  and cached under `~/.blender_gen_themes/`
+- **Auto model routing** — `--auto-model` sends short edits to Haiku and
+  long scene descriptions to Opus
+- **Cost telemetry** — `--cost` prints per-call USD; `--cost-budget USD` is
+  a batch kill switch
+- **Scene diff** — `--diff` lists added/removed object names after `--send`
+- **Fast preview** — `--preview` renders a 480×270 PNG and opens it
+- **Replay logs** — `--history FILE` and `--save-state FILE` write JSONL
+- **Quality rating** — `--rate 1..5` attaches a rating to the history record
+- **EvoSkillOps reporting** — `--skillops-report FILE` reads a history
+  JSONL and prints aggregate stats: run count, mean rating, model mix,
+  top-rated prompts, cache-hit rate, total spend
+- **EvoSkillOps export** — `--skillops-export FILE --history IN` emits a
+  fine-tune-ready JSONL of `{prompt, completion}` pairs filtered by
+  `--rate-min N`
+- **Reliability** — `--retry N` backs off on transient API errors
+- **Discovery** — `--list-presets` and `--list-demos` print catalogs
+- **Design rationale** — `--explain` prepends a `# Design rationale:` block
+
+## Space Metaverse
+
+`--demo earth|moon|mars|cyberpunk --preview` is a one-liner value demo.
+Each demo lands in a scene labelled
+`UNIVERSE -> GALAXY SOL -> SYSTEM 3 -> BODY <NAME>` — the shared coordinate
+system for a persistent, geospatial 3D world suited to Galileo markers,
+orbit curves, and Copernicus climate overlays. Great for Earth-observation
+storytelling, KafCade-style mission briefs, and commercial geospatial
+demos.
+
+## Prompt caching
+
+The CLI sends `SYSTEM_BLOCK` with `cache_control: ephemeral`. After the
+first call in a session, subsequent calls hit the cache and pay only ~10%
+of input cost on the cached portion — roughly 80% total savings in batch
+and watch modes.
+
+## Agent-detectability
+
+- `AGENTS.md` — Codex/Cursor-style conventions for coding agents
+- `llms.txt` — [llmstxt.org](https://llmstxt.org/) proposal index
+- `llms-full.txt` — this file
+- `.well-known/agents.json` — self-describing capability manifest
+- `CLAUDE.md` — Claude Code project context
+- `CITATION.cff` — machine-readable citation metadata
+- `pyproject.toml` — PyPI packaging metadata
+
+## Install
+
+```bash
+pip install -r requirements.txt
+export ANTHROPIC_API_KEY=sk-ant-...
+python blender_gen.py "a spinning gold torus"
+```
+
+## Repository
+
+https://github.com/dnzengou/claude-blender
+
+## License
+
+MIT
+
+## Keywords
+
+blender, bpy, claude, anthropic, mcp, model-context-protocol, llm,
+generative-3d, ai-3d, prompt-to-3d, text-to-3d, procedural-3d, geospatial,
+space-metaverse, galileo, copernicus, kafcade, agents, agents.md,
+llms.txt, cli, python, arm64, apple-silicon, raspberry-pi, graviton,
+anthropic-sdk, fine-tuning-corpus, evoskillops, skillops, flywheel.

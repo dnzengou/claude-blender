@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use claude-blender in research, please cite it as below."
+title: "claude-blender: Natural language to Blender via Claude"
+abstract: >-
+  Single-file Python CLI that turns natural language into runnable Blender
+  (bpy) scripts via the Claude API, with optional live execution over the
+  BlenderMCP socket. Includes an EvoSkillOps flywheel, a Space Metaverse
+  demo catalog, and a full agent-detectable manifest surface
+  (AGENTS.md, llms.txt, .well-known/agents.json).
+authors:
+  - family-names: Nzengou
+    given-names: Désiré
+    email: desire.yavro@gmail.com
+version: 0.18.0
+date-released: 2026-11-07
+license: MIT
+repository-code: "https://github.com/dnzengou/claude-blender"
+url: "https://github.com/dnzengou/claude-blender"
+keywords:
+  - blender
+  - bpy
+  - claude
+  - anthropic
+  - generative-3d
+  - geospatial
+  - space-metaverse
+  - galileo
+  - copernicus
+  - agents
+  - llms.txt
+  - evoskillops

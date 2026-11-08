@@ -1,0 +1,130 @@
+{
+  "schema_version": "v1",
+  "name_for_model": "claude_blender",
+  "name_for_human": "claude-blender",
+  "description_for_human": "Natural language to Blender Python scripts via the Claude API. Single-file CLI, pure Python, ARM-compatible.",
+  "description_for_model": "Command-line tool that compiles natural-language prompts into runnable Blender bpy scripts via the Anthropic Messages API. Supports live execution over the BlenderMCP socket (localhost:9876 by default), scene round-trip, streaming, batch, hot-reload, auto model routing (haiku/sonnet/opus), prompt caching, cost telemetry, replay logs, a JSONL history flywheel with per-run user ratings, an EvoSkillOps reporter that aggregates history into training signals, an EvoSkillOps exporter that emits a fine-tune-ready prompt/completion corpus, theme packs from files or HTTPS URLs, and a Space Metaverse demo catalog (earth/moon/mars/cyberpunk) with KafCade mission briefs.",
+  "repository": "https://github.com/dnzengou/claude-blender",
+  "homepage": "https://github.com/dnzengou/claude-blender#readme",
+  "license": "MIT",
+  "logo_url": "https://raw.githubusercontent.com/dnzengou/claude-blender/main/logo.png",
+  "contact_email": "desire.yavro@gmail.com",
+  "legal_info_url": "https://github.com/dnzengou/claude-blender/blob/main/LICENSE",
+  "entry_point": "blender_gen.py",
+  "runtime": {
+    "language": "python",
+    "min_version": "3.9",
+    "dependencies": ["anthropic"],
+    "native_extensions": false,
+    "architectures": ["aarch64", "x86_64"],
+    "platforms": ["linux", "macos", "windows"]
+  },
+  "capabilities": [
+    {
+      "id": "generate",
+      "summary": "Generate a bpy script from a natural-language prompt.",
+      "command": "python blender_gen.py \"<prompt>\" [-o FILE] [--model claude-opus-4-7|claude-sonnet-4-6|claude-haiku-4-5-20251001]"
+    },
+    {
+      "id": "send",
+      "summary": "Execute a generated script in a running Blender via the BlenderMCP socket.",
+      "command": "python blender_gen.py \"<prompt>\" --send [--host HOST] [--port 9876]",
+      "requires": ["BlenderMCP add-on running in Blender"]
+    },
+    {
+      "id": "scene-roundtrip",
+      "summary": "Fetch live Blender scene JSON and inject it into the Claude prompt.",
+      "command": "python blender_gen.py \"<prompt>\" --scene --send"
+    },
+    {
+      "id": "batch",
+      "summary": "Generate one script per prompt line in a file.",
+      "command": "python blender_gen.py --batch FILE --output-dir DIR [--cost-budget USD]"
+    },
+    {
+      "id": "watch",
+      "summary": "Watch a prompt file and regenerate on every save.",
+      "command": "python blender_gen.py --watch FILE --send"
+    },
+    {
+      "id": "iterate",
+      "summary": "Auto-fix loop: re-prompt Claude on Blender execution errors.",
+      "command": "python blender_gen.py \"<prompt>\" --send --iterate N"
+    },
+    {
+      "id": "preset",
+      "summary": "Prepend a style preset to the prompt (built-in: cyberpunk, nature, abstract, scifi, toon).",
+      "command": "python blender_gen.py \"<prompt>\" --preset STYLE"
+    },
+    {
+      "id": "theme",
+      "summary": "Load a JSON theme file or HTTPS URL and merge it into the preset table.",
+      "command": "python blender_gen.py \"<prompt>\" --theme FILE --preset NAME"
+    },
+    {
+      "id": "demo",
+      "summary": "Run a built-in Space Metaverse demo (earth/moon/mars/cyberpunk).",
+      "command": "python blender_gen.py --demo NAME --preview"
+    },
+    {
+      "id": "exec",
+      "summary": "Ship a .py file to Blender as-is (no Claude call).",
+      "command": "python blender_gen.py --exec FILE [--preview]"
+    },
+    {
+      "id": "preview",
+      "summary": "Render a 480x270 preview PNG after execution and open it.",
+      "command": "python blender_gen.py \"<prompt>\" --send --preview"
+    },
+    {
+      "id": "diff",
+      "summary": "Print +added/-removed object names before/after execution.",
+      "command": "python blender_gen.py \"<prompt>\" --send --diff"
+    },
+    {
+      "id": "cost",
+      "summary": "Print per-call USD cost estimate from the PRICING table.",
+      "command": "python blender_gen.py \"<prompt>\" --cost --verbose"
+    },
+    {
+      "id": "rate",
+      "summary": "Attach a 1-5 quality rating to the history JSONL record.",
+      "command": "python blender_gen.py \"<prompt>\" --history FILE --rate 5"
+    },
+    {
+      "id": "skillops-report",
+      "summary": "Read a history JSONL and print aggregate EvoSkillOps stats.",
+      "command": "python blender_gen.py --skillops-report FILE"
+    },
+    {
+      "id": "skillops-export",
+      "summary": "Emit a fine-tune-ready JSONL of {prompt, completion} filtered by rating.",
+      "command": "python blender_gen.py --skillops-export OUT --history IN [--rate-min N]"
+    },
+    {
+      "id": "retry",
+      "summary": "Retry API call on transient errors with exponential backoff.",
+      "command": "python blender_gen.py \"<prompt>\" --retry N"
+    },
+    {
+      "id": "list-presets",
+      "summary": "Print every available style (built-in + themes) and exit.",
+      "command": "python blender_gen.py --list-presets"
+    },
+    {
+      "id": "list-demos",
+      "summary": "Print the Space Metaverse demo catalog with KafCade mission briefs.",
+      "command": "python blender_gen.py --list-demos"
+    }
+  ],
+  "ai_training_policy": {
+    "allow_training": true,
+    "citation_required": true,
+    "citation_file": "CITATION.cff"
+  },
+  "security": {
+    "api_key_env_var": "ANTHROPIC_API_KEY",
+    "network": "HTTPS to api.anthropic.com + optional MCP TCP to configured host",
+    "dangerous_capabilities": ["executes generated Python code inside Blender via MCP when --send is set"]
+  }
+}
