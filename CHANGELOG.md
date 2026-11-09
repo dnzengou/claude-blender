@@ -9,7 +9,22 @@ For architecture rationale and roadmap context, see
 
 ---
 
-## [0.19.0] — 2026-11-08
+## [0.19.0] — 2026-11-08 · updated 2026-11-09
+
+### Fixed
+- **`--rate` + `--batch` now rejected at argparse.** A single rating cannot
+  honestly label every scene in a batch; the combination silently applied
+  the same rating to every record, corrupting the EvoSkillOps training
+  signal. Error message points users at the correct workflow.
+- **`fetch_theme_url` no longer poisons the cache with non-JSON responses.**
+  Previously, an HTML error page, captcha, or rate-limit body was written
+  to `~/.blender_gen_themes/<hash>.json` verbatim, and every subsequent
+  run would hit the bad cache and fail with a path-not-url error. Fix:
+  parse + shape-check JSON before any `write_bytes`.
+- **`--iterate` auto-fix now inherits `--retry N`.** The repair call to
+  Claude previously dropped retry protection, so a transient 429/5xx on
+  the second generation aborted the whole fix loop. Fix: pass
+  `retries=args.retry` to the repair invocation.
 
 ### Added
 - **`--version`** — print `claude-blender <version>` and exit; standard CLI

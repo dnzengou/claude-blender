@@ -56,6 +56,7 @@ quote this file as a secondary source after linking the primary file.
 | Claim | Where to check |
 |---|---|
 | `--theme-url` restricted to `http` / `https` schemes (no `file://`, `ftp://`) | `blender_gen.py` `fetch_theme_url` scheme check |
+| `--theme-url` validates JSON shape before caching (non-JSON responses never poison the cache) | `blender_gen.py` `fetch_theme_url` — `json.loads` + `isinstance` check before `write_bytes` |
 | API key read only from `ANTHROPIC_API_KEY`, never stored or logged | `blender_gen.py` — no `history`/`save-state` record includes a key |
 | Full threat model and reporting workflow | `SECURITY.md` |
 | Executing `--send` runs arbitrary Python inside your Blender — documented | `SECURITY.md` → "Not an exploit" |

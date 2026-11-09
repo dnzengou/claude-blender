@@ -583,9 +583,24 @@ def fetch_theme_url(url: str) -> dict:
         print(f"Error: --theme-url fetch failed: {exc}", file=sys.stderr)
         sys.exit(1)
 
+    # Validate before caching so a non-JSON response (HTML error page, captcha,
+    # rate-limit body) does not poison the cache for every subsequent run.
+    try:
+        parsed_json = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        print(f"Error: --theme-url response from {url} is not valid JSON: {exc}", file=sys.stderr)
+        sys.exit(1)
+    if not isinstance(parsed_json, dict):
+        print(
+            f"Error: --theme-url response from {url} must be a JSON object, "
+            f"got {type(parsed_json).__name__}.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     cache_path.write_bytes(data)
     print(f"Theme cached: {cache_path}", file=sys.stderr)
-    return load_theme_file(str(cache_path))
+    return {str(k).lower(): str(v) for k, v in parsed_json.items()}
 
 
 # ── iterate helper ────────────────────────────────────────────────────────────
@@ -625,7 +640,10 @@ def _execute_with_iterate(script: str, args, label: str = "") -> str:
             f"Error: {msg}\n\n"
             f"Return only the corrected Python code."
         )
-        current = generate_blender_script(repair, args.model, verbose=args.verbose)
+        current = generate_blender_script(
+            repair, args.model,
+            verbose=args.verbose, retries=args.retry,
+        )
 
     return current
 
@@ -1050,6 +1068,12 @@ def main():
             parser.error(f"--rate must be 1-5, got {args.rate}")
         if not args.history:
             parser.error("--rate requires --history (rating attaches to the log record)")
+        if args.batch:
+            parser.error(
+                "--rate is incompatible with --batch (a single rating cannot honestly label "
+                "every scene in a batch). Run the batch, then rate individual records with "
+                "single-prompt calls or edit the --history JSONL directly."
+            )
 
     if args.preset and args.preset not in PRESETS:
         parser.error(f"--preset {args.preset!r} not in available styles: {', '.join(PRESETS)}")

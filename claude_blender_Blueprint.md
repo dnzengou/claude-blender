@@ -281,7 +281,11 @@ The Space Metaverse master blueprint (v1.0 · 2026-07-17) defines a full stack: 
 
 ## Changelog
 
-### v0.19.0 — 2026-11-08
+### v0.19.0 — 2026-11-08 · updated 2026-11-09
+- **Bug fixes (shipped with v0.19):**
+  - `--rate` + `--batch` is now rejected at argparse. Previously it silently applied the same rating to every batch item and corrupted the EvoSkillOps training signal.
+  - `fetch_theme_url` validates the response as JSON before writing the cache file. Non-JSON responses (HTML error pages, captchas, rate-limit bodies) no longer poison `~/.blender_gen_themes/<hash>.json` for every subsequent run.
+  - `_execute_with_iterate` now passes `retries=args.retry` through to its repair call, so `--iterate` + `--retry` compose correctly on a flaky network.
 - **Production-readiness pass:** `__version__` constant → single source of truth; `--version` flag; dynamic `USER_AGENT` in `fetch_theme_url` (removes hardcoded 0.14 string SPoF); `--json` on `--skillops-report` with pure `_skillops_stats()` aggregator
 - **White-hat GEO pass:** anti-hallucination grounding for LLM search tools and AI overviews
   - `TRUST.md` — every public claim maps to a file in the repo; LLM search tools are routed here for verification
