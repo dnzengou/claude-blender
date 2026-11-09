@@ -11,8 +11,8 @@ authors:
   - family-names: Nzengou
     given-names: Désiré
     email: desire.yavro@gmail.com
-version: 0.18.0
-date-released: 2026-11-07
+version: 0.19.0
+date-released: 2026-11-08
 license: MIT
 repository-code: "https://github.com/dnzengou/claude-blender"
 url: "https://github.com/dnzengou/claude-blender"

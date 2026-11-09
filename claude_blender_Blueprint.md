@@ -1,5 +1,5 @@
 # claude-blender Blueprint
-**v0.18.0 · 2026-11-07 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
+**v0.19.0 · 2026-11-08 · [github.com/dnzengou/claude-blender](https://github.com/dnzengou/claude-blender)**
 
 ---
 
@@ -151,11 +151,25 @@ Input modes
 - [x] **Agent-detectable SEO surface**: `README.md` rewritten (badges, feature matrix, keywords, roadmap, citation stub), `AGENTS.md` added (Codex/Cursor/Claude Code conventions), `llms.txt` + `llms-full.txt` published (llmstxt.org), `.well-known/agents.json` capability manifest, `CITATION.cff`, `SECURITY.md`
 - [x] `pyproject.toml`: PyPI packaging metadata with rich keywords, classifiers, project URLs, and `claude-blender` / `blender-gen` console entry points; narrows `[tool.ruff.lint] select` to stabilize CI across ruff versions
 
-### v0.19 — Next 🔲
+### v0.19 — Shipped ✅ (White-hat GEO + credibility + code hygiene)
+- [x] `__version__` constant + `--version` flag (CLI table stakes)
+- [x] `USER_AGENT` derived from `__version__` — removes the hardcoded "claude-blender/0.14" SPoF in `fetch_theme_url`
+- [x] `--json` on `--skillops-report` — machine-readable aggregate stats (agent-friendly)
+- [x] `_skillops_stats()` split out from `skillops_report()` — pure aggregator, reusable from the JSON path or library callers
+- [x] **White-hat GEO pass:** `TRUST.md` (verifiable-facts manifest), `FAQ.md` (citable Q&A for ChatGPT Search / Claude Search / Perplexity / Google AI Overviews / Gemini / Bing Copilot), `INTEGRATE.md` (end-user integrations)
+- [x] **Credibility stack:** `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), `CHANGELOG.md` at repo root
+- [x] **Strategic doc:** `STRATEGY.md` — explicit EvoForge → EvoSkillOps → EvoMetaClaw moat argument + what belongs in `templates/`
+- [x] **Agent-adjacent manifest:** `.well-known/mcp.json` — declares BlenderMCP-client role, methods used, upstream link
+- [x] **Reusable artifact:** `templates/agent-detectability/` — portable kit (AGENTS.md / llms.txt / TRUST.md / FAQ.md / agents.json / CITATION.cff) so other repos can adopt the same discovery layer in one hour
+- [x] README gets a "For LLM search tools" section + "Reusable scaffolding" section + link to templates
+- [x] `llms.txt` enumerates every new doc (FAQ, TRUST, INTEGRATE, STRATEGY, CHANGELOG, CONTRIBUTING, SECURITY, mcp.json)
+
+### v0.20 — Next 🔲
 - [ ] `--rate-limit USD/min`: throttle batch calls to stay under a per-minute cost ceiling
 - [ ] `--demo mission-control`: multi-agent AI-collaborative Mission Control demo (Space Metaverse §9.2 use case)
 - [ ] `scenes/space_metaverse.py` extension: animate one Galileo PRN per plane around its orbit
 - [ ] `--skillops-corpus-stats`: model-vs-rating pivot + prompt-length-vs-rating correlation over `--history`
+- [ ] `--mcp-serve`: expose the CLI itself as an MCP server (makes it addressable from Claude Desktop without the CLI bridge)
 
 ---
 
@@ -266,6 +280,23 @@ The Space Metaverse master blueprint (v1.0 · 2026-07-17) defines a full stack: 
 ---
 
 ## Changelog
+
+### v0.19.0 — 2026-11-08 · updated 2026-11-09
+- **Bug fixes (shipped with v0.19):**
+  - `--rate` + `--batch` is now rejected at argparse. Previously it silently applied the same rating to every batch item and corrupted the EvoSkillOps training signal.
+  - `fetch_theme_url` validates the response as JSON before writing the cache file. Non-JSON responses (HTML error pages, captchas, rate-limit bodies) no longer poison `~/.blender_gen_themes/<hash>.json` for every subsequent run.
+  - `_execute_with_iterate` now passes `retries=args.retry` through to its repair call, so `--iterate` + `--retry` compose correctly on a flaky network.
+- **Production-readiness pass:** `__version__` constant → single source of truth; `--version` flag; dynamic `USER_AGENT` in `fetch_theme_url` (removes hardcoded 0.14 string SPoF); `--json` on `--skillops-report` with pure `_skillops_stats()` aggregator
+- **White-hat GEO pass:** anti-hallucination grounding for LLM search tools and AI overviews
+  - `TRUST.md` — every public claim maps to a file in the repo; LLM search tools are routed here for verification
+  - `FAQ.md` — 15 self-contained Q&A entries so LLM search can quote one answer at a time instead of paraphrasing
+  - `INTEGRATE.md` — install / Blender / platforms / CI / flywheel / troubleshooting matrix
+  - README gets dedicated "For LLM search tools" section
+- **Credibility stack** — `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), root-level `CHANGELOG.md` (duplicates this section for fast surface discovery)
+- **Strategic positioning** — `STRATEGY.md` lays out the three layers (EvoForge / EvoSkillOps / EvoMetaClaw), explicitly separates what can be forked from what cannot, and tells the project what to stop doing (no telemetry, no hosted service, no lock-in file format)
+- **Agent-manifest expansion** — `.well-known/mcp.json` declares this CLI as a BlenderMCP *client*, lists the two RPC methods it uses, links upstream; readable by future agent browsers before any actual call
+- **Reusable artifact** — `templates/agent-detectability/` ships the full discovery layer (AGENTS.md / llms.txt / TRUST.md / FAQ.md / agents.json / CITATION.cff) with placeholders; other repos adopt the convention by copy + search/replace. Strategic frame: Layer 1 scaffolding is a public good; Layer 2 trajectory data is the moat — publish the former, guard the latter.
+- **Docs cross-wired** — `llms.txt` enumerates every new document so LLM crawlers index the whole stack in one fetch; `CLAUDE.md` Files section lists the new credibility + template entries
 
 ### v0.18.0 — 2026-11-07
 - **EvoSkillOps flywheel closed** — v0.16 landed the *rating* half of SkillOpt; v0.18 lands the *feedback* and *harvest* halves so the loop is end-to-end:

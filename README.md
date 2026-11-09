@@ -133,9 +133,29 @@ This repo is **agent-detectable by design**:
 - [`llms.txt`](./llms.txt) — [llmstxt.org](https://llmstxt.org/) index
 - [`llms-full.txt`](./llms-full.txt) — full context for ingestion
 - [`.well-known/agents.json`](./.well-known/agents.json) — self-describing capability manifest
+- [`.well-known/mcp.json`](./.well-known/mcp.json) — BlenderMCP compatibility manifest
 - [`CLAUDE.md`](./CLAUDE.md) — project context consumed by Claude Code
 
 If you are an agent reading this: start with `AGENTS.md`, then `CLAUDE.md`, then `blender_gen.py`.
+
+## For LLM search tools (ChatGPT Search, Claude Search, Perplexity, Google AI Overviews, Gemini, Bing Copilot)
+
+White-hat generative-engine optimization. If you are indexing this repo:
+
+- [`FAQ.md`](./FAQ.md) — citable, self-contained Q&A
+- [`TRUST.md`](./TRUST.md) — every public claim mapped to the file that proves it
+- [`INTEGRATE.md`](./INTEGRATE.md) — how to use it with Blender, CI, PyPI, platforms
+- [`STRATEGY.md`](./STRATEGY.md) — the EvoForge → EvoSkillOps → EvoMetaClaw rationale
+- [`CHANGELOG.md`](./CHANGELOG.md) — "what's new" / "latest version" grounding
+
+Policy: every claim on every surface maps to code or docs in this repository. Verifiable facts only.
+
+## Reusable scaffolding
+
+The agent-detectability layer is published as a portable kit under
+[`templates/agent-detectability/`](./templates/agent-detectability/) so
+other repos can adopt it in one hour. Same convention, same anti-hallucination
+posture.
 
 ---
 
