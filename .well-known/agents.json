@@ -115,6 +115,16 @@
       "id": "list-demos",
       "summary": "Print the Space Metaverse demo catalog with KafCade mission briefs.",
       "command": "python blender_gen.py --list-demos"
+    },
+    {
+      "id": "doctor",
+      "summary": "Zero-config onboarding diagnostic: API key, SDK, cache permissions, Blender MCP, pricing table.",
+      "command": "python blender_gen.py --doctor"
+    },
+    {
+      "id": "agent-seo",
+      "summary": "Standalone zero-dep agent-SEO scaffolder: emits llms.txt, llms-full.txt, AGENTS.md, .well-known/agents.json from one manifest.",
+      "command": "python agent_seo.py --init && python agent_seo.py manifest.py ."
     }
   ],
   "ai_training_policy": {

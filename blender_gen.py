@@ -58,6 +58,8 @@ for _stream in (sys.stdout, sys.stderr):
         except Exception:  # noqa: BLE001 — defensive: never crash on stream config
             pass
 
+__version__ = "0.19.0"
+
 MCP_TIMEOUT = 10  # seconds
 
 SYSTEM_PROMPT = """You are a Blender Python scripting expert. Output complete, runnable bpy scripts only.
@@ -415,6 +417,80 @@ def skillops_export(out_path: str, history_path: str, rate_min: int) -> None:
     )
 
 
+# ── onboarding: --doctor ──────────────────────────────────────────────────────
+
+def _check(label: str, ok: bool, detail: str = "", hint: str = "") -> bool:
+    """Print one check line; return ok."""
+    mark = "OK " if ok else "XX "
+    print(f"  [{mark}] {label}{': ' + detail if detail else ''}")
+    if not ok and hint:
+        print(f"         -> {hint}")
+    return ok
+
+
+def run_doctor(host: str, port: int) -> int:
+    """Zero-config onboarding diagnostic. Exits 0 on all-green, 1 otherwise."""
+    print(f"claude-blender {__version__} — doctor\n")
+    failures = 0
+
+    # 1. anthropic SDK
+    ok = _check("anthropic SDK",
+                anthropic is not None,
+                getattr(anthropic, "__version__", "installed"))
+    if not ok:
+        failures += 1
+
+    # 2. ANTHROPIC_API_KEY
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    masked = (key[:7] + "..." + key[-4:]) if len(key) > 14 else ("(missing)" if not key else "(short)")
+    failures += not _check(
+        "ANTHROPIC_API_KEY", bool(key), masked,
+        "export ANTHROPIC_API_KEY=sk-ant-... (https://console.anthropic.com/)",
+    )
+
+    # 3. writable cache dirs
+    try:
+        THEME_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        probe = THEME_CACHE_DIR / ".probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+        _check("theme cache", True, str(THEME_CACHE_DIR))
+    except OSError as exc:
+        failures += 1
+        _check("theme cache", False, str(exc), f"ensure {THEME_CACHE_DIR} is writable")
+
+    # 4. Blender MCP socket (non-fatal)
+    try:
+        with socket.create_connection((host, port), timeout=2):
+            pass
+        _check("Blender MCP", True, f"{host}:{port} reachable")
+    except (ConnectionRefusedError, OSError) as exc:
+        _check("Blender MCP", False, f"{host}:{port} unreachable ({exc.__class__.__name__})",
+               "optional — only needed for --send/--scene/--preview/--diff/--demo")
+
+    # 5. pricing coverage
+    missing = [m for m in ("claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5-20251001")
+               if m not in PRICING]
+    failures += not _check(
+        "pricing table", not missing,
+        "all models covered" if not missing else f"missing {missing}",
+        "update PRICING in blender_gen.py from anthropic.com/pricing",
+    )
+
+    # 6. demo scenes present
+    missing_scenes = [cfg["scene"] for cfg in DEMOS.values() if not Path(cfg["scene"]).exists()]
+    _check("demo scenes", not missing_scenes,
+           "all present" if not missing_scenes else f"missing {missing_scenes}",
+           "run from the repo root; demos resolve relative paths")
+
+    print()
+    if failures:
+        print(f"doctor: {failures} critical check(s) failed. Fix and rerun --doctor.")
+        return 1
+    print("doctor: ready. Try  python blender_gen.py \"a spinning gold torus\" --dry-run")
+    return 0
+
+
 # ── Claude generation ─────────────────────────────────────────────────────────
 
 EXPLAIN_SUFFIX = (
@@ -549,7 +625,7 @@ def fetch_theme_url(url: str) -> dict:
         return load_theme_file(str(cache_path))
 
     print(f"Fetching theme from {url}...", file=sys.stderr)
-    req = urllib.request.Request(url, headers={"User-Agent": "claude-blender/0.14"})
+    req = urllib.request.Request(url, headers={"User-Agent": f"claude-blender/{__version__}"})
     try:
         with urllib.request.urlopen(req, timeout=THEME_URL_TIMEOUT) as resp:  # noqa: S310 - scheme validated above
             data = resp.read()
@@ -865,6 +941,9 @@ def main():
     parser = argparse.ArgumentParser(
         description="Claude -> Blender: natural language to bpy scripts"
     )
+    parser.add_argument("--version", action="version", version=f"claude-blender {__version__}")
+    parser.add_argument("--doctor", action="store_true",
+                        help="Run onboarding diagnostic (API key, Blender MCP, cache perms) and exit")
 
     # Input modes are mutually exclusive but not always required
     # (--list-presets exits before any input is needed).
@@ -965,6 +1044,9 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if args.doctor:
+        sys.exit(run_doctor(args.host, args.port))
 
     if args.exec_path or args.demo:
         args.send = True  # --exec/--demo are meaningless without sending; must precede --send guards

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "claude-blender"
-version = "0.18.0"
+version = "0.19.0"
 description = "Natural language to Blender Python scripts via the Claude API. Single-file CLI, pure Python, ARM-compatible."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -71,9 +71,10 @@ Documentation = "https://github.com/dnzengou/claude-blender#readme"
 [project.scripts]
 claude-blender = "blender_gen:main"
 blender-gen = "blender_gen:main"
+agent-seo = "agent_seo:main"
 
 [tool.setuptools]
-py-modules = ["blender_gen"]
+py-modules = ["blender_gen", "agent_seo"]
 
 [tool.ruff]
 line-length = 120
