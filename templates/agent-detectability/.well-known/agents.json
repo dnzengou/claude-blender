@@ -1,0 +1,38 @@
+{
+  "schema_version": "v1",
+  "name_for_model": "PROJECT_NAME",
+  "name_for_human": "PROJECT_NAME",
+  "description_for_human": "ONE_LINE_DESCRIPTION",
+  "description_for_model": "<longer description tuned for agents — list every user-visible capability>",
+  "repository": "REPO_URL",
+  "homepage": "REPO_URL#readme",
+  "license": "MIT",
+  "contact_email": "AUTHOR_EMAIL",
+  "legal_info_url": "REPO_URL/blob/main/LICENSE",
+  "entry_point": "<path to main file>",
+  "runtime": {
+    "language": "<language>",
+    "min_version": "<semver>",
+    "dependencies": ["<dep>"],
+    "native_extensions": false,
+    "architectures": ["aarch64", "x86_64"],
+    "platforms": ["linux", "macos", "windows"]
+  },
+  "capabilities": [
+    {
+      "id": "<id>",
+      "summary": "<what it does>",
+      "command": "<example invocation>"
+    }
+  ],
+  "ai_training_policy": {
+    "allow_training": true,
+    "citation_required": true,
+    "citation_file": "CITATION.cff"
+  },
+  "security": {
+    "api_key_env_var": "<ENV_NAME or null>",
+    "network": "<outbound hosts>",
+    "dangerous_capabilities": []
+  }
+}
