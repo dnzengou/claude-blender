@@ -40,9 +40,11 @@ python blender_gen.py --skillops-report runs.jsonl                        # EvoS
 python blender_gen.py --skillops-export corpus.jsonl --history runs.jsonl --rate-min 4   # fine-tune corpus
 ```
 
-## Flags (v0.18)
+## Flags (v0.19)
 | Flag | Effect |
 |------|--------|
+| `--doctor` | Run onboarding diagnostic (API key, SDK, cache perms, Blender MCP, pricing) and exit |
+| `--version` | Print version and exit |
 | `--send` | Execute script in running Blender via MCP socket |
 | `--scene` | Fetch live scene state from Blender, inject into Claude prompt |
 | `--stream` | Stream Claude output token-by-token to stdout |
@@ -79,6 +81,7 @@ python blender_gen.py --skillops-export corpus.jsonl --history runs.jsonl --rate
 
 ## Files
 - `blender_gen.py` — main CLI, entry point
+- `agent_seo.py` — standalone, zero-dep agent-SEO scaffolder (`llms.txt`, `AGENTS.md`, `.well-known/agents.json`)
 - `requirements.txt` — single dep: anthropic
 - `pyproject.toml` — PyPI packaging metadata + ruff config (narrow select)
 - `.gitignore` — excludes .env, caches, venvs
