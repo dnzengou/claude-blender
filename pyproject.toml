@@ -71,9 +71,10 @@ Documentation = "https://github.com/dnzengou/claude-blender#readme"
 [project.scripts]
 claude-blender = "blender_gen:main"
 blender-gen = "blender_gen:main"
+agent-seo = "agent_seo:main"
 
 [tool.setuptools]
-py-modules = ["blender_gen"]
+py-modules = ["blender_gen", "agent_seo"]
 
 [tool.ruff]
 line-length = 120

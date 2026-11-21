@@ -2,6 +2,8 @@
 
 **Natural language → Blender Python scripts, powered by Claude.** One CLI. Zero plugins. Any machine, any CPU.
 
+**v0.19** — `--doctor` onboarding · `agent_seo` standalone SEO scaffolder · `--version`.
+
 ![python](https://img.shields.io/badge/python-3.9%2B-blue)
 ![platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows%20%7C%20arm64-lightgrey)
 ![claude](https://img.shields.io/badge/claude-opus%204.7%20%7C%20sonnet%204.6%20%7C%20haiku%204.5-5A3FFF)
@@ -26,24 +28,30 @@ Pair Claude's coding intelligence with Blender's 3D engine and treat prompts as 
 
 ---
 
-## Quickstart
+## 60-second Quickstart
 
 ```bash
+# 1. Install
 pip install -r requirements.txt
-export ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_API_KEY=sk-ant-...     # https://console.anthropic.com/
 
-# One-shot: print bpy script to stdout
+# 2. Verify — one command, zero tokens
+python blender_gen.py --doctor
+
+# 3. First scene — no Blender needed, no tokens burned
+python blender_gen.py "a spinning gold torus" --dry-run --auto-model
+
+# 4. Real scene — prints runnable bpy code to stdout
 python blender_gen.py "a spinning gold torus on a marble pedestal"
 
-# Save to file
-python blender_gen.py "cyberpunk city 8x8 grid" -o city.py
-
-# Live Blender (requires BlenderMCP add-on + 'Connect to Claude' pressed in Blender)
+# 5. Ship it to Blender (needs BlenderMCP add-on + 'Connect to Claude' pressed)
 python blender_gen.py "add neon lights to the scene" --scene --send
 
-# One-liner value demo — ships a geospatial Earth scene
+# 6. One-liner value demo — a geospatial Earth scene end-to-end
 python blender_gen.py --demo earth --preview
 ```
+
+Stuck? `python blender_gen.py --doctor` tells you which step is red.
 
 ---
 
@@ -72,6 +80,7 @@ python blender_gen.py --demo earth --preview
 | Design rationale | `--explain` | Prepend `# Design rationale:` comment block |
 | Dry run | `--dry-run` | Resolve model + prompt preview without burning tokens |
 | Catalogs | `--list-presets` · `--list-demos` | Discovery with one command |
+| Onboarding | `--doctor` · `--version` | Zero-config diagnostic + version stamp |
 
 See [`CLAUDE.md`](./CLAUDE.md) for the full flag reference and [`AGENTS.md`](./AGENTS.md) for the agent-integration guide.
 
@@ -125,6 +134,29 @@ Blender side: open Blender, enable the BlenderMCP add-on, press **Connect to Cla
 
 ---
 
+## Standalone: `agent_seo`
+
+The agent-SEO scaffolding is also shipped as a **standalone module** (`agent_seo.py`) you can drop into any project — zero deps, pure stdlib, ARM-safe. It emits the four files that make a codebase legible to AI agents and LLM crawlers (`llms.txt`, `llms-full.txt`, `AGENTS.md`, `.well-known/agents.json`) from one Python dataclass manifest.
+
+```bash
+# Scaffold a manifest template, edit it, regenerate SEO files anywhere
+python agent_seo.py --init
+python agent_seo.py manifest.py ./my-project
+```
+
+Library use:
+
+```python
+from agent_seo import AgentManifest, Capability, write_all
+write_all(AgentManifest(name="my-tool", human="My Tool", summary="...",
+                        repository="https://github.com/me/my-tool",
+                        entry_point="my_tool.py"))
+```
+
+Ships the same spec `claude-blender` uses in production. Reuse it on every repo you want AI agents to discover and self-orient in.
+
+---
+
 ## For AI coding agents
 
 This repo is **agent-detectable by design**:
@@ -161,7 +193,7 @@ posture.
 
 ## Roadmap
 
-See [`claude_blender_Blueprint.md`](./claude_blender_Blueprint.md) for the full roadmap and version history. Current: **v0.18 — EvoSkillOps · Agent-Detectable SEO**.
+See [`claude_blender_Blueprint.md`](./claude_blender_Blueprint.md) for the full roadmap and version history. Current: **v0.19 — Onboarding · Modular Agent-SEO**.
 
 ---
 
