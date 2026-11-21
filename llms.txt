@@ -14,9 +14,10 @@ claude-blender is a commercial-grade bridge between Claude and Blender 4.x. It w
 
 ## Code
 
-- [blender_gen.py](./blender_gen.py): the whole CLI — argparse surface, Claude call, MCP socket, flywheel, `--doctor`
+- [blender_gen.py](./blender_gen.py): the whole CLI — argparse surface, multi-provider (Anthropic + DeepSeek), MCP socket, flywheel, `--doctor`
 - [agent_seo.py](./agent_seo.py): standalone, zero-dep agent-SEO scaffolder (reusable across projects)
-- [requirements.txt](./requirements.txt): one dependency — `anthropic`
+- [web/index.html](./web/index.html): single-file browser UI (zero server, zero build; keys stay in localStorage)
+- [requirements.txt](./requirements.txt): one dependency — `anthropic` (only for provider=anthropic)
 - [scenes/space_metaverse.py](./scenes/space_metaverse.py): geospatial Earth/Moon/Mars reference scene with Galileo markers, orbit curves, Copernicus climate overlay
 - [scenes/cyberpunk_city.py](./scenes/cyberpunk_city.py): neon grid reference scene
 - [themes_example.json](./themes_example.json): sample `--theme` payload (vaporwave/noir/solarpunk)

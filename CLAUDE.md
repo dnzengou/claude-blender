@@ -40,11 +40,13 @@ python blender_gen.py --skillops-report runs.jsonl                        # EvoS
 python blender_gen.py --skillops-export corpus.jsonl --history runs.jsonl --rate-min 4   # fine-tune corpus
 ```
 
-## Flags (v0.19)
+## Flags (v0.20)
 | Flag | Effect |
 |------|--------|
-| `--doctor` | Run onboarding diagnostic (API key, SDK, cache perms, Blender MCP, pricing) and exit |
+| `--doctor` | Run onboarding diagnostic (keys, SDK, cache perms, Blender MCP, pricing) and exit |
 | `--version` | Print version and exit |
+| `--provider` | `anthropic` (default) or `deepseek` (env: `BLENDER_GEN_PROVIDER`; key: `DEEPSEEK_API_KEY`) |
+| `--list-models` | Print models per provider and exit |
 | `--send` | Execute script in running Blender via MCP socket |
 | `--scene` | Fetch live scene state from Blender, inject into Claude prompt |
 | `--stream` | Stream Claude output token-by-token to stdout |
@@ -80,8 +82,9 @@ python blender_gen.py --skillops-export corpus.jsonl --history runs.jsonl --rate
 | `--rate-min N` | Minimum rating 1-5 for `--skillops-export` to keep a record (default: 4) |
 
 ## Files
-- `blender_gen.py` — main CLI, entry point
+- `blender_gen.py` — main CLI, entry point (Anthropic + DeepSeek providers)
 - `agent_seo.py` — standalone, zero-dep agent-SEO scaffolder (`llms.txt`, `AGENTS.md`, `.well-known/agents.json`)
+- `web/index.html` — single-file browser UI (no build, no server): Anthropic + DeepSeek, keys stored in localStorage
 - `requirements.txt` — single dep: anthropic
 - `pyproject.toml` — PyPI packaging metadata + ruff config (narrow select)
 - `.gitignore` — excludes .env, caches, venvs
