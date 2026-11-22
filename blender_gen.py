@@ -58,7 +58,7 @@ for _stream in (sys.stdout, sys.stderr):
         except Exception:  # noqa: BLE001 — defensive: never crash on stream config
             pass
 
-__version__ = "0.19.0"
+__version__ = "0.21.0"
 USER_AGENT = f"claude-blender/{__version__}"
 
 MCP_TIMEOUT = 10  # seconds
@@ -128,6 +128,25 @@ PRICING: dict[str, tuple] = {
     "claude-opus-4-7":            (15.00, 75.00, 1.50, 18.75),
     "claude-sonnet-4-6":          ( 3.00, 15.00, 0.30,  3.75),
     "claude-haiku-4-5-20251001":  ( 0.80,  4.00, 0.08,  1.00),
+    # DeepSeek (OpenAI-compatible; no cache_read/cache_write, columns repeated).
+    "deepseek-chat":              ( 0.27,  1.10, 0.27,  1.10),
+    "deepseek-reasoner":          ( 0.55,  2.19, 0.55,  2.19),
+    # Gemini (OpenAI-compatible endpoint; no cache columns).
+    "gemini-2.5-pro":             ( 1.25, 10.00, 1.25, 10.00),
+    "gemini-2.5-flash":           ( 0.30,  2.50, 0.30,  2.50),
+}
+
+# Providers → base URL (for OpenAI-compatible), key env, default model, catalog.
+PROVIDERS: dict[str, dict] = {
+    "anthropic": {"default_model": "claude-opus-4-7", "key_env": "ANTHROPIC_API_KEY",
+                  "models": ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"]},
+    "deepseek":  {"default_model": "deepseek-chat", "base_url": "https://api.deepseek.com",
+                  "key_env": "DEEPSEEK_API_KEY",
+                  "models": ["deepseek-chat", "deepseek-reasoner"]},
+    "gemini":    {"default_model": "gemini-2.5-flash",
+                  "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+                  "key_env": "GEMINI_API_KEY",
+                  "models": ["gemini-2.5-pro", "gemini-2.5-flash"]},
 }
 
 
@@ -249,15 +268,29 @@ EDIT_VERBS = {"add", "remove", "delete", "move", "scale", "rotate", "set", "chan
               "rename", "color", "tint", "shift", "translate", "duplicate"}
 
 
-def _pick_model(prompt: str, default: str) -> str:
-    """Heuristic: short imperative edit → haiku; full-scene description → opus.
-    Returns default if the prompt does not match either pattern."""
+def _pick_model(prompt: str, default: str, provider: str = "anthropic") -> str:
+    """Heuristic: short imperative edit → cheap model; full-scene description → strong model.
+    Returns default if the prompt does not match either pattern. Provider-aware."""
     words = prompt.strip().lower().split()
     if not words:
         return default
-    if len(words) <= 8 and words[0] in EDIT_VERBS:
+    short_edit = len(words) <= 8 and words[0] in EDIT_VERBS
+    long_scene = len(words) > 20
+    if provider == "deepseek":
+        if short_edit:
+            return "deepseek-chat"
+        if long_scene:
+            return "deepseek-reasoner"
+        return default
+    if provider == "gemini":
+        if short_edit:
+            return "gemini-2.5-flash"
+        if long_scene:
+            return "gemini-2.5-pro"
+        return default
+    if short_edit:
         return "claude-haiku-4-5-20251001"
-    if len(words) > 20:
+    if long_scene:
         return "claude-opus-4-7"
     return default
 
@@ -464,13 +497,20 @@ def run_doctor(host: str, port: int) -> int:
     if not ok:
         failures += 1
 
-    # 2. ANTHROPIC_API_KEY
-    key = os.environ.get("ANTHROPIC_API_KEY", "")
-    masked = (key[:7] + "..." + key[-4:]) if len(key) > 14 else ("(missing)" if not key else "(short)")
-    failures += not _check(
-        "ANTHROPIC_API_KEY", bool(key), masked,
-        "export ANTHROPIC_API_KEY=sk-ant-... (https://console.anthropic.com/)",
-    )
+    # 2. API keys — at least one provider must be configured.
+    def _mask(v: str) -> str:
+        return (v[:5] + "..." + v[-4:]) if len(v) > 10 else ("(missing)" if not v else "(short)")
+    found = False
+    for prov, cfg in PROVIDERS.items():
+        env = cfg["key_env"]
+        val = os.environ.get(env, "")
+        if val:
+            found = True
+        _check(env, bool(val), _mask(val),
+               f"export {env}=... to enable --provider {prov}  (optional)")
+    if not found:
+        failures += 1
+        print("         -> at least one provider key is required to generate.")
 
     # 3. writable cache dirs
     try:
@@ -552,32 +592,70 @@ def _call_with_retry(fn, retries: int):
             time.sleep(delay)
 
 
+class _Usage:
+    """Lightweight usage shim compatible with anthropic's response.usage shape."""
+    def __init__(self, input_tokens: int, output_tokens: int,
+                 cache_read_input_tokens: int = 0, cache_creation_input_tokens: int = 0):
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+        self.cache_read_input_tokens = cache_read_input_tokens
+        self.cache_creation_input_tokens = cache_creation_input_tokens
+
+
+def _openai_compat_call(provider: str, prompt: str, model: str, stream: bool) -> tuple[str, _Usage]:
+    """OpenAI-compatible POST. Serves DeepSeek and Gemini through the same shape.
+    Pure stdlib, no new dep. Streaming is coalesced to a single final print."""
+    cfg = PROVIDERS[provider]
+    key = os.environ.get(cfg["key_env"], "")
+    if not key:
+        print(f"Error: {cfg['key_env']} is not set.", file=sys.stderr)
+        sys.exit(1)
+    body = json.dumps({
+        "model": model,
+        "max_tokens": 4096,
+        "stream": False,
+        "messages": [{"role": "system", "content": SYSTEM_PROMPT},
+                     {"role": "user", "content": prompt}],
+    }).encode()
+    req = urllib.request.Request(
+        cfg["base_url"] + "/chat/completions",
+        data=body,
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
+                 "User-Agent": f"claude-blender/{__version__}"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310 — https endpoint fixed above
+        data = json.loads(resp.read())
+    text = data["choices"][0]["message"]["content"]
+    u = data.get("usage", {}) or {}
+    usage = _Usage(
+        input_tokens=int(u.get("prompt_tokens", 0)),
+        output_tokens=int(u.get("completion_tokens", 0)),
+        cache_read_input_tokens=int(u.get("prompt_cache_hit_tokens", 0)),
+    )
+    if stream:
+        print(text, flush=True)
+    return text, usage
+
+
 def generate_blender_script(prompt: str, model: str, stream: bool = False, verbose: bool = False,
                              show_cost: bool = False, dry_run: bool = False,
                              explain: bool = False, cost_sink: list | None = None,
-                             retries: int = 0) -> str:
-    """Call Claude with a cached system prompt. Returns complete bpy script.
+                             retries: int = 0, provider: str = "anthropic") -> str:
+    """Call the selected LLM provider with a cached system prompt. Returns complete bpy script.
 
     dry_run=True skips the API call, prints the resolved model + prompt preview, returns "".
     cost_sink, if a list, has the per-call USD cost appended (None-safe entries skipped).
+    provider: 'anthropic' (default) | 'deepseek'.
     """
     if explain:
         prompt = prompt + EXPLAIN_SUFFIX
 
     if dry_run:
         preview = prompt if len(prompt) <= 240 else prompt[:240] + "…"
-        print(f"[DRY RUN] model={model}", file=sys.stderr)
+        print(f"[DRY RUN] provider={provider} model={model}", file=sys.stderr)
         print(f"[DRY RUN] prompt={preview}", file=sys.stderr)
         return ""
-
-    client = anthropic.Anthropic()
-
-    kwargs = dict(
-        model=model,
-        max_tokens=4096,
-        system=SYSTEM_BLOCK,
-        messages=[{"role": "user", "content": prompt}],
-    )
 
     def _post(usage):
         if verbose:
@@ -588,6 +666,20 @@ def generate_blender_script(prompt: str, model: str, stream: bool = False, verbo
             c = _estimate_cost(usage, model)
             if c is not None:
                 cost_sink.append(c)
+
+    if provider in ("deepseek", "gemini"):
+        text, usage = _call_with_retry(lambda: _openai_compat_call(provider, prompt, model, stream), retries)
+        _post(usage)
+        return text
+
+    # anthropic (default)
+    client = anthropic.Anthropic()
+    kwargs = dict(
+        model=model,
+        max_tokens=4096,
+        system=SYSTEM_BLOCK,
+        messages=[{"role": "user", "content": prompt}],
+    )
 
     if stream:
         def _do_stream():
@@ -715,6 +807,8 @@ def _execute_with_iterate(script: str, args, label: str = "") -> str:
             f"Error: {msg}\n\n"
             f"Return only the corrected Python code."
         )
+        current = generate_blender_script(repair, args.model, verbose=args.verbose,
+                                           provider=args.provider, retries=args.retry)
         current = generate_blender_script(
             repair, args.model,
             verbose=args.verbose, retries=args.retry,
@@ -737,7 +831,7 @@ def run_single(prompt: str, args) -> None:
         except (ConnectionRefusedError, OSError) as exc:
             print(f"Warning: cannot reach Blender MCP ({exc}). Ignoring --scene.", file=sys.stderr)
 
-    model = _pick_model(prompt, args.model) if args.auto_model else args.model
+    model = _pick_model(prompt, args.model, args.provider) if args.auto_model else args.model
     if args.auto_model and (args.verbose or args.dry_run):
         print(f"auto-model: {model}", file=sys.stderr)
 
@@ -745,7 +839,7 @@ def run_single(prompt: str, args) -> None:
         prompt, model,
         stream=args.stream, verbose=args.verbose,
         show_cost=args.cost, dry_run=args.dry_run,
-        explain=args.explain, retries=args.retry,
+        explain=args.explain, retries=args.retry, provider=args.provider,
     )
 
     if not script:  # dry-run path; nothing downstream applies
@@ -792,13 +886,14 @@ def run_batch(prompts: list[str], args) -> None:
         print(f"[{i}/{total}] {prompt[:60]}", file=sys.stderr)
         if args.preset:
             prompt = PRESETS[args.preset] + prompt
-        model = _pick_model(prompt, args.model) if args.auto_model else args.model
+        model = _pick_model(prompt, args.model, args.provider) if args.auto_model else args.model
         if args.auto_model and (args.verbose or args.dry_run):
             print(f"  auto-model: {model}", file=sys.stderr)
         script = generate_blender_script(
             prompt, model,
             verbose=args.verbose, show_cost=args.cost, dry_run=args.dry_run,
             explain=args.explain, cost_sink=cost_sink, retries=args.retry,
+            provider=args.provider,
         )
 
         # Budget gate: halt before next call once cumulative spend exceeds threshold
@@ -992,6 +1087,8 @@ def main():
     parser.add_argument("--version", action="version", version=f"claude-blender {__version__}")
     parser.add_argument("--doctor", action="store_true",
                         help="Run onboarding diagnostic (API key, Blender MCP, cache perms) and exit")
+    parser.add_argument("--open", dest="open_ui", action="store_true",
+                        help="Open the local browser UI (web/index.html) in the default browser and exit")
 
     # Input modes are mutually exclusive but not always required
     # (--list-presets exits before any input is needed).
@@ -1010,11 +1107,19 @@ def main():
                                    "filtered by --rate-min, then exit (requires --history)")
 
     parser.add_argument(
-        "--model",
-        default="claude-opus-4-7",
-        choices=["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
-        help="Claude model (default: opus-4-7)",
+        "--provider",
+        default=os.environ.get("BLENDER_GEN_PROVIDER", "anthropic"),
+        choices=list(PROVIDERS),
+        help="LLM provider (default: anthropic; env BLENDER_GEN_PROVIDER). deepseek uses DEEPSEEK_API_KEY.",
     )
+    parser.add_argument(
+        "--model",
+        default=None,
+        help="Model id. Default: provider's default (anthropic→opus-4-7, deepseek→deepseek-chat). "
+             "Use --list-models to see the catalog.",
+    )
+    parser.add_argument("--list-models", action="store_true",
+                        help="Print models per provider and exit")
     parser.add_argument("--output", "-o", metavar="FILE", help="Save script to file (single mode)")
     parser.add_argument("--output-dir", metavar="DIR", help="Output directory for batch mode")
     parser.add_argument("--send", action="store_true", help="Execute script(s) in Blender via MCP socket")
@@ -1099,6 +1204,31 @@ def main():
 
     if args.doctor:
         sys.exit(run_doctor(args.host, args.port))
+
+    if args.open_ui:
+        ui = Path(__file__).resolve().parent / "web" / "index.html"
+        if not ui.exists():
+            print(f"Error: UI not found at {ui}", file=sys.stderr)
+            sys.exit(1)
+        _open_preview(str(ui))  # reuses the cross-platform opener
+        print(f"Opened {ui}")
+        return
+
+    if args.list_models:
+        for prov, cfg in PROVIDERS.items():
+            print(f"{prov}:")
+            for m in cfg["models"]:
+                mark = "  (default)" if m == cfg["default_model"] else ""
+                print(f"  {m}{mark}")
+        return
+
+    # Resolve default model from provider; validate choice.
+    if args.model is None:
+        args.model = PROVIDERS[args.provider]["default_model"]
+    valid = PROVIDERS[args.provider]["models"]
+    if args.model not in valid:
+        parser.error(f"--model {args.model!r} not valid for provider {args.provider!r}. "
+                     f"Choose from: {', '.join(valid)}")
 
     if args.exec_path or args.demo:
         args.send = True  # --exec/--demo are meaningless without sending; must precede --send guards

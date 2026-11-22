@@ -2,7 +2,7 @@
 
 **Natural language → Blender Python scripts, powered by Claude.** One CLI. Zero plugins. Any machine, any CPU.
 
-**v0.19** — `--doctor` onboarding · `agent_seo` standalone SEO scaffolder · `--version`.
+**v0.21** — Gemini provider · 17-test unit suite · GitHub Pages auto-deploy · `--open` launches the local UI.
 
 ![python](https://img.shields.io/badge/python-3.9%2B-blue)
 ![platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows%20%7C%20arm64-lightgrey)
@@ -19,6 +19,8 @@
 
 Pair Claude's coding intelligence with Blender's 3D engine and treat prompts as a *technical director*. The CLI is the glue: it talks to Claude for code, to Blender for execution, and to your flywheel for everything that comes next.
 
+- **Multi-provider.** Anthropic Claude, DeepSeek, or Google Gemini — flip with `--provider`, same prompts, same quality signal.
+- **Runs in the browser.** Single static HTML in `web/` — no server, no build, no deps. Open the file, paste a key, generate.
 - **Pure Python.** No native extensions. Runs on Apple Silicon, Raspberry Pi, AWS Graviton, x86.
 - **Prompt-cached system block.** ~80% token-cost reduction after the first call in a batch.
 - **Live scene round-trip.** `--scene` pulls the current Blender state back into the prompt; `--send` pushes the generated script back into the viewport.
@@ -52,6 +54,35 @@ python blender_gen.py --demo earth --preview
 ```
 
 Stuck? `python blender_gen.py --doctor` tells you which step is red.
+
+### Prefer the browser?
+
+```bash
+# Local — open the file. No server needed.
+open web/index.html          # macOS
+xdg-open web/index.html      # Linux
+start web\\index.html        # Windows
+```
+
+Paste an Anthropic or DeepSeek key once (stored in your browser only), pick a model, press <kbd>Ctrl</kbd>+<kbd>Enter</kbd>. Copy or download the `.py` and paste into Blender's Text Editor. Host it on GitHub Pages if you want a zero-backend SaaS surface.
+
+### Pick a provider
+
+```bash
+# Default: Anthropic
+python blender_gen.py "spinning torus"                         # opus-4-7
+
+# Switch to DeepSeek (OpenAI-compatible, no new dep)
+export DEEPSEEK_API_KEY=sk-...
+python blender_gen.py "spinning torus" --provider deepseek     # deepseek-chat
+
+# Switch to Google Gemini (OpenAI-compatible, no new dep)
+export GEMINI_API_KEY=...
+python blender_gen.py "spinning torus" --provider gemini       # gemini-2.5-flash
+
+python blender_gen.py --list-models                            # full catalog
+python blender_gen.py --open                                   # launch the browser UI
+```
 
 ---
 

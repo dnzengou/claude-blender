@@ -14,7 +14,7 @@
   "runtime": {
     "language": "python",
     "min_version": "3.9",
-    "dependencies": ["anthropic"],
+    "dependencies": ["anthropic (optional — only for provider=anthropic; deepseek uses urllib)"],
     "native_extensions": false,
     "architectures": ["aarch64", "x86_64"],
     "platforms": ["linux", "macos", "windows"]
@@ -125,6 +125,21 @@
       "id": "agent-seo",
       "summary": "Standalone zero-dep agent-SEO scaffolder: emits llms.txt, llms-full.txt, AGENTS.md, .well-known/agents.json from one manifest.",
       "command": "python agent_seo.py --init && python agent_seo.py manifest.py ."
+    },
+    {
+      "id": "provider",
+      "summary": "Select the LLM provider. Anthropic (default), DeepSeek, or Google Gemini (OpenAI-compatible endpoints, no new dep).",
+      "command": "python blender_gen.py \"<prompt>\" --provider {anthropic|deepseek|gemini}"
+    },
+    {
+      "id": "open-ui",
+      "summary": "Launch the local browser UI (web/index.html) in the default browser.",
+      "command": "python blender_gen.py --open"
+    },
+    {
+      "id": "browser",
+      "summary": "Static single-file web UI (web/index.html). No server, no build. Keys stored in browser localStorage.",
+      "command": "open web/index.html"
     }
   ],
   "ai_training_policy": {

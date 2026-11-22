@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>claude-blender · browser</title>
+<meta name="description" content="Natural language to Blender Python scripts, in the browser. Anthropic or DeepSeek. Zero server. Zero build.">
+<style>
+  :root{
+    --bg:#0e0f12; --panel:#15171c; --edge:#262a33; --ink:#e7eaf0; --dim:#8a93a6;
+    --accent:#7c6cff; --ok:#3ec28f; --err:#ff6a6a; --warn:#f0b74a;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#fafbfc; --panel:#fff; --edge:#e4e7ec; --ink:#141821; --dim:#5a6577;
+      --accent:#5A3FFF; --ok:#1f8f66; --err:#c23232;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e0f12; --panel:#15171c; --edge:#262a33; --ink:#e7eaf0; --dim:#8a93a6;
+    --accent:#7c6cff; --ok:#3ec28f; --err:#ff6a6a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  main{max-width:960px;margin:0 auto;padding:16px}
+  header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0 16px}
+  header h1{font-size:18px;margin:0;font-weight:600;letter-spacing:-.01em}
+  header .tag{font-size:11px;color:var(--dim);border:1px solid var(--edge);
+    padding:2px 7px;border-radius:999px}
+  .card{background:var(--panel);border:1px solid var(--edge);border-radius:10px;
+    padding:14px;margin-bottom:12px}
+  label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
+  input,select,textarea,button{
+    font:inherit;color:inherit;background:var(--bg);
+    border:1px solid var(--edge);border-radius:8px;padding:9px 11px;width:100%}
+  textarea{min-height:92px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .row{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+  button{background:var(--accent);border-color:var(--accent);color:#fff;cursor:pointer;
+    font-weight:600;transition:filter .15s}
+  button:hover:not(:disabled){filter:brightness(1.1)}
+  button:disabled{opacity:.6;cursor:not-allowed}
+  button.ghost{background:transparent;color:var(--ink);border-color:var(--edge)}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  pre{background:var(--bg);border:1px solid var(--edge);border-radius:8px;
+    padding:12px;overflow:auto;max-height:50vh;margin:0;
+    font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+  .status{font-size:12px;color:var(--dim);min-height:16px}
+  .status.ok{color:var(--ok)} .status.err{color:var(--err)}
+  details summary{cursor:pointer;color:var(--dim);font-size:12px;padding:4px 0}
+  footer{color:var(--dim);font-size:12px;margin-top:16px;text-align:center}
+  a{color:var(--accent)}
+  .pill{display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;
+    background:var(--edge);color:var(--dim);margin-left:6px;vertical-align:middle}
+  kbd{background:var(--edge);padding:1px 5px;border-radius:4px;font-size:11px}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>claude-blender</h1>
+    <span class="tag">browser · v0.20</span>
+    <span class="tag">zero server · zero build</span>
+  </header>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <label for="provider">Provider</label>
+        <select id="provider">
+          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="gemini">Google Gemini</option>
+        </select>
+      </div>
+      <div>
+        <label for="model">Model</label>
+        <select id="model"></select>
+      </div>
+      <div>
+        <label for="key">API key <span class="pill">localStorage only</span></label>
+        <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-...">
+      </div>
+    </div>
+    <details style="margin-top:8px">
+      <summary>Advanced</summary>
+      <div class="row" style="margin-top:8px">
+        <div>
+          <label for="preset">Style preset</label>
+          <select id="preset">
+            <option value="">(none)</option>
+            <option>cyberpunk</option><option>nature</option><option>abstract</option>
+            <option>scifi</option><option>toon</option>
+          </select>
+        </div>
+        <div>
+          <label for="maxtok">Max tokens</label>
+          <input id="maxtok" type="number" value="4096" min="256" max="8192" step="256">
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <label for="prompt">Prompt — what to build in Blender <span class="pill"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span></label>
+    <textarea id="prompt" placeholder="a spinning gold torus on a marble pedestal"></textarea>
+    <div class="actions">
+      <button id="go">Generate</button>
+      <button id="copy" class="ghost" disabled>Copy</button>
+      <button id="dl"   class="ghost" disabled>Download .py</button>
+      <button id="clr"  class="ghost">Clear</button>
+    </div>
+    <p id="status" class="status"></p>
+  </div>
+
+  <div class="card">
+    <label>Generated <code>bpy</code> script</label>
+    <pre id="out" aria-live="polite"><code>// Output appears here. Run it in Blender's Text Editor.</code></pre>
+  </div>
+
+  <footer>
+    Keys are stored only in your browser and sent directly to the provider.
+    · <a href="https://github.com/dnzengou/claude-blender">source</a>
+    · <a href="../README.md">README</a>
+  </footer>
+</main>
+
+<script>
+(() => {
+  const MODELS = {
+    anthropic: [
+      {id:"claude-opus-4-7",            label:"claude-opus-4-7 (default)"},
+      {id:"claude-sonnet-4-6",          label:"claude-sonnet-4-6"},
+      {id:"claude-haiku-4-5-20251001",  label:"claude-haiku-4-5 (fast)"},
+    ],
+    deepseek: [
+      {id:"deepseek-chat",     label:"deepseek-chat (default)"},
+      {id:"deepseek-reasoner", label:"deepseek-reasoner"},
+    ],
+    gemini: [
+      {id:"gemini-2.5-flash", label:"gemini-2.5-flash (default)"},
+      {id:"gemini-2.5-pro",   label:"gemini-2.5-pro"},
+    ],
+  };
+  const PRESETS = {
+    cyberpunk: "Style: neon-lit cyberpunk aesthetic — glowing emissive materials in cyan/magenta/yellow, dark metallic surfaces, wet reflective ground, volumetric fog. ",
+    nature:    "Style: organic low-poly nature scene — earth tones, subsurface scattering on foliage, soft diffuse lighting, no sharp edges. ",
+    abstract:  "Style: abstract geometric art — bold primary colors, hard-edge materials, dramatic directional lighting, mathematical precision. ",
+    scifi:     "Style: hard-surface sci-fi — metallic panels with subtle emission, modular geometry, cool blue/white lighting, clean industrial aesthetic. ",
+    toon:      "Style: toon-shaded cartoon — flat colors with Toon BSDF, thick outlines via Solidify modifier, bright saturated palette, no cast shadows. ",
+  };
+  const SYS = `You are a Blender Python scripting expert. Output complete, runnable bpy scripts only.
+Rules:
+- Start every script with: import bpy
+- Clear existing scene objects when starting fresh: bpy.ops.wm.read_factory_settings(use_empty=True)
+- Use only: bpy.data, bpy.ops, bpy.context — no external imports
+- Scripts must run in Blender's Text Editor (Run Script button) or via socket execution
+- Default to low-poly geometry unless the user specifies detail
+- No placeholder comments like "# add more objects here" — complete the implementation
+- Return ONLY the Python code, no prose, no markdown fences`;
+
+  const $ = id => document.getElementById(id);
+  const providerSel = $("provider"), modelSel = $("model"), keyInp = $("key");
+  const presetSel = $("preset"), maxtokInp = $("maxtok");
+  const promptInp = $("prompt"), out = $("out"), status = $("status");
+  const btnGo = $("go"), btnCopy = $("copy"), btnDl = $("dl"), btnClr = $("clr");
+
+  // ── storage (per provider) ─────────────────────────────────────────────
+  const storeKey = p => `claude-blender/key:${p}`;
+  const safeGet = (k, d="") => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
+  const safeSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+
+  function fillModels(prov) {
+    modelSel.innerHTML = "";
+    MODELS[prov].forEach(m => {
+      const o = document.createElement("option");
+      o.value = m.id; o.textContent = m.label;
+      modelSel.appendChild(o);
+    });
+    const savedModel = safeGet(`claude-blender/model:${prov}`);
+    if (savedModel) modelSel.value = savedModel;
+  }
+
+  function loadForProvider() {
+    const p = providerSel.value;
+    keyInp.value = safeGet(storeKey(p));
+    keyInp.placeholder = p === "anthropic" ? "sk-ant-..." : "sk-...";
+    fillModels(p);
+  }
+
+  providerSel.addEventListener("change", loadForProvider);
+  keyInp.addEventListener("change", () => safeSet(storeKey(providerSel.value), keyInp.value));
+  modelSel.addEventListener("change", () => safeSet(`claude-blender/model:${providerSel.value}`, modelSel.value));
+
+  // Restore last provider used
+  const lastProv = safeGet("claude-blender/provider", "anthropic");
+  providerSel.value = MODELS[lastProv] ? lastProv : "anthropic";
+  providerSel.addEventListener("change", () => safeSet("claude-blender/provider", providerSel.value));
+  loadForProvider();
+
+  // ── strip fences if the model ignored the rule ─────────────────────────
+  function cleanFences(s) {
+    const m = s.match(/^```(?:python)?\s*\n([\s\S]*?)\n```\s*$/);
+    return m ? m[1] : s;
+  }
+
+  // ── providers ──────────────────────────────────────────────────────────
+  async function callAnthropic(prompt, model, key, maxTokens) {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model, max_tokens: maxTokens,
+        system: [{type:"text", text: SYS, cache_control:{type:"ephemeral"}}],
+        messages: [{role:"user", content: prompt}],
+      }),
+    });
+    if (!r.ok) throw new Error(`Anthropic ${r.status}: ${await r.text()}`);
+    const j = await r.json();
+    return j.content.map(b => b.text || "").join("");
+  }
+
+  async function callOpenAICompat(url, label, prompt, model, key, maxTokens) {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {"content-type": "application/json", authorization: `Bearer ${key}`},
+      body: JSON.stringify({
+        model, max_tokens: maxTokens,
+        messages: [{role:"system", content: SYS}, {role:"user", content: prompt}],
+      }),
+    });
+    if (!r.ok) throw new Error(`${label} ${r.status}: ${await r.text()}`);
+    const j = await r.json();
+    return j.choices[0].message.content;
+  }
+  const callDeepSeek = (p,m,k,t) => callOpenAICompat(
+    "https://api.deepseek.com/chat/completions", "DeepSeek", p,m,k,t);
+  const callGemini   = (p,m,k,t) => callOpenAICompat(
+    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "Gemini", p,m,k,t);
+
+  // ── UX actions ─────────────────────────────────────────────────────────
+  function setStatus(msg, kind="") {
+    status.textContent = msg;
+    status.className = "status " + kind;
+  }
+
+  async function generate() {
+    const prov = providerSel.value;
+    const model = modelSel.value;
+    const key = keyInp.value.trim();
+    const maxTokens = Math.max(256, Math.min(8192, parseInt(maxtokInp.value, 10) || 4096));
+    let prompt = promptInp.value.trim();
+    if (!prompt)  { setStatus("Enter a prompt first.", "err"); return; }
+    if (!key)     { setStatus("Paste an API key — it stays in your browser.", "err"); keyInp.focus(); return; }
+    if (presetSel.value) prompt = PRESETS[presetSel.value] + prompt;
+
+    btnGo.disabled = true; btnCopy.disabled = true; btnDl.disabled = true;
+    out.textContent = "";
+    setStatus("Generating…");
+    const t0 = performance.now();
+    try {
+      const text = prov === "anthropic" ? await callAnthropic(prompt, model, key, maxTokens)
+                 : prov === "gemini"    ? await callGemini(prompt, model, key, maxTokens)
+                 :                        await callDeepSeek(prompt, model, key, maxTokens);
+      const code = cleanFences(text).trim();
+      out.textContent = code;
+      btnCopy.disabled = !code; btnDl.disabled = !code;
+      const dt = ((performance.now() - t0) / 1000).toFixed(1);
+      setStatus(`Done in ${dt}s · ${code.length} chars · ${prov}/${model}`, "ok");
+    } catch (e) {
+      out.textContent = "";
+      setStatus(String(e.message || e), "err");
+    } finally {
+      btnGo.disabled = false;
+    }
+  }
+
+  btnGo.addEventListener("click", generate);
+  promptInp.addEventListener("keydown", e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") generate();
+  });
+  btnCopy.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(out.textContent);
+      setStatus("Copied.", "ok");
+    } catch { setStatus("Copy blocked — select the code and Ctrl+C.", "err"); }
+  });
+  btnDl.addEventListener("click", () => {
+    const blob = new Blob([out.textContent], {type:"text/x-python"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "scene.py";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+  btnClr.addEventListener("click", () => {
+    promptInp.value = ""; out.textContent = "";
+    btnCopy.disabled = true; btnDl.disabled = true;
+    setStatus("");
+  });
+})();
+</script>
+</body>
+</html>
