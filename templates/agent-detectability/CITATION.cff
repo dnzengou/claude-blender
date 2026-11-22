@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use PROJECT_NAME in research, please cite it as below."
+title: "PROJECT_NAME: ONE_LINE_DESCRIPTION"
+authors:
+  - family-names: <family>
+    given-names: <given>
+    email: AUTHOR_EMAIL
+version: 0.1.0
+date-released: 2026-01-01
+license: MIT
+repository-code: "REPO_URL"
+url: "REPO_URL"
+keywords:
+  - <keyword>

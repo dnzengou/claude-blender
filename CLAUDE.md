@@ -44,6 +44,9 @@ python blender_gen.py --skillops-export corpus.jsonl --history runs.jsonl --rate
 | Flag | Effect |
 |------|--------|
 | `--doctor` | Run onboarding diagnostic (keys, SDK, cache perms, Blender MCP, pricing) and exit |
+| `--version` | Print `claude-blender <version>` and exit |
+| `--json` | Emit machine-readable JSON (used by `--skillops-report`) |
+| `--doctor` | Run onboarding diagnostic (API key, SDK, cache perms, Blender MCP, pricing) and exit |
 | `--version` | Print version and exit |
 | `--provider` | `anthropic` (default), `deepseek`, or `gemini` (env: `BLENDER_GEN_PROVIDER`; keys: `ANTHROPIC_API_KEY` / `DEEPSEEK_API_KEY` / `GEMINI_API_KEY`) |
 | `--list-models` | Print models per provider and exit |
@@ -99,6 +102,15 @@ python blender_gen.py --skillops-export corpus.jsonl --history runs.jsonl --rate
 - `.well-known/agents.json` — self-describing capability manifest
 - `CITATION.cff` — machine-readable citation metadata
 - `SECURITY.md` — vulnerability-reporting policy and threat model
+- `TRUST.md` — verifiable-facts manifest (white-hat GEO)
+- `FAQ.md` — citable Q&A for LLM search tools
+- `INTEGRATE.md` — end-user integration guide
+- `STRATEGY.md` — EvoForge / EvoSkillOps / EvoMetaClaw moat rationale
+- `CONTRIBUTING.md` — contributor guidance and flag-adding workflow
+- `CODE_OF_CONDUCT.md` — Contributor Covenant 2.1
+- `CHANGELOG.md` — root-level per-release change log
+- `.well-known/mcp.json` — BlenderMCP compatibility manifest
+- `templates/agent-detectability/` — reusable kit: AGENTS.md / llms.txt / TRUST.md / FAQ.md / agents.json / CITATION.cff scaffolds for other repos
 
 ## Conventions
 - No native C extensions; stays ARM-compatible

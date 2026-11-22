@@ -1,0 +1,30 @@
+{
+  "schema_version": "v1",
+  "name": "claude-blender",
+  "description": "Natural-language → Blender bpy scripts via Claude. Ships generated code to Blender over the BlenderMCP socket.",
+  "role": "client",
+  "mcp_server_dependency": {
+    "name": "BlenderMCP",
+    "upstream": "https://github.com/ahujasid/blender-mcp",
+    "transport": "tcp",
+    "default_host": "localhost",
+    "default_port": 9876,
+    "install_hint": "Install the BlenderMCP add-on in Blender, open the N-panel → BlenderMCP tab → Connect to Claude."
+  },
+  "rpc_methods_used": [
+    {
+      "method": "execute_code",
+      "purpose": "Run the generated bpy script inside the active Blender session."
+    },
+    {
+      "method": "get_scene_info",
+      "purpose": "Fetch live scene state to inject into the prompt (--scene) and to compute object diffs (--diff)."
+    }
+  ],
+  "exposes_mcp_server": false,
+  "future_work": {
+    "expose_as_mcp_server": "Not yet. A '--mcp-serve' mode could expose the CLI as an MCP server itself — see STRATEGY.md non-goals."
+  },
+  "repository": "https://github.com/dnzengou/claude-blender",
+  "license": "MIT"
+}
