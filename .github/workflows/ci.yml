@@ -29,4 +29,7 @@ jobs:
         run: ruff check blender_gen.py
 
       - name: Syntax check
-        run: python -m py_compile blender_gen.py && echo "OK"
+        run: python -m py_compile blender_gen.py agent_seo.py && echo "OK"
+
+      - name: Unit tests
+        run: python -m unittest discover tests -v

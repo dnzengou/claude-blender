@@ -45,8 +45,9 @@ python blender_gen.py --skillops-export corpus.jsonl --history runs.jsonl --rate
 |------|--------|
 | `--doctor` | Run onboarding diagnostic (keys, SDK, cache perms, Blender MCP, pricing) and exit |
 | `--version` | Print version and exit |
-| `--provider` | `anthropic` (default) or `deepseek` (env: `BLENDER_GEN_PROVIDER`; key: `DEEPSEEK_API_KEY`) |
+| `--provider` | `anthropic` (default), `deepseek`, or `gemini` (env: `BLENDER_GEN_PROVIDER`; keys: `ANTHROPIC_API_KEY` / `DEEPSEEK_API_KEY` / `GEMINI_API_KEY`) |
 | `--list-models` | Print models per provider and exit |
+| `--open` | Open the local browser UI (web/index.html) and exit |
 | `--send` | Execute script in running Blender via MCP socket |
 | `--scene` | Fetch live scene state from Blender, inject into Claude prompt |
 | `--stream` | Stream Claude output token-by-token to stdout |

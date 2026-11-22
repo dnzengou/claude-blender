@@ -70,6 +70,7 @@
         <select id="provider">
           <option value="anthropic">Anthropic (Claude)</option>
           <option value="deepseek">DeepSeek</option>
+          <option value="gemini">Google Gemini</option>
         </select>
       </div>
       <div>
@@ -135,6 +136,10 @@
     deepseek: [
       {id:"deepseek-chat",     label:"deepseek-chat (default)"},
       {id:"deepseek-reasoner", label:"deepseek-reasoner"},
+    ],
+    gemini: [
+      {id:"gemini-2.5-flash", label:"gemini-2.5-flash (default)"},
+      {id:"gemini-2.5-pro",   label:"gemini-2.5-pro"},
     ],
   };
   const PRESETS = {
@@ -220,8 +225,8 @@ Rules:
     return j.content.map(b => b.text || "").join("");
   }
 
-  async function callDeepSeek(prompt, model, key, maxTokens) {
-    const r = await fetch("https://api.deepseek.com/chat/completions", {
+  async function callOpenAICompat(url, label, prompt, model, key, maxTokens) {
+    const r = await fetch(url, {
       method: "POST",
       headers: {"content-type": "application/json", authorization: `Bearer ${key}`},
       body: JSON.stringify({
@@ -229,10 +234,14 @@ Rules:
         messages: [{role:"system", content: SYS}, {role:"user", content: prompt}],
       }),
     });
-    if (!r.ok) throw new Error(`DeepSeek ${r.status}: ${await r.text()}`);
+    if (!r.ok) throw new Error(`${label} ${r.status}: ${await r.text()}`);
     const j = await r.json();
     return j.choices[0].message.content;
   }
+  const callDeepSeek = (p,m,k,t) => callOpenAICompat(
+    "https://api.deepseek.com/chat/completions", "DeepSeek", p,m,k,t);
+  const callGemini   = (p,m,k,t) => callOpenAICompat(
+    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "Gemini", p,m,k,t);
 
   // ── UX actions ─────────────────────────────────────────────────────────
   function setStatus(msg, kind="") {
@@ -255,9 +264,9 @@ Rules:
     setStatus("Generating…");
     const t0 = performance.now();
     try {
-      const text = prov === "anthropic"
-        ? await callAnthropic(prompt, model, key, maxTokens)
-        : await callDeepSeek(prompt, model, key, maxTokens);
+      const text = prov === "anthropic" ? await callAnthropic(prompt, model, key, maxTokens)
+                 : prov === "gemini"    ? await callGemini(prompt, model, key, maxTokens)
+                 :                        await callDeepSeek(prompt, model, key, maxTokens);
       const code = cleanFences(text).trim();
       out.textContent = code;
       btnCopy.disabled = !code; btnDl.disabled = !code;

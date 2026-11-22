@@ -2,7 +2,7 @@
 
 **Natural language → Blender Python scripts, powered by Claude.** One CLI. Zero plugins. Any machine, any CPU.
 
-**v0.20** — browser UI · multi-provider (Anthropic + DeepSeek) · `--doctor` · standalone `agent_seo`.
+**v0.21** — Gemini provider · 17-test unit suite · GitHub Pages auto-deploy · `--open` launches the local UI.
 
 ![python](https://img.shields.io/badge/python-3.9%2B-blue)
 ![platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows%20%7C%20arm64-lightgrey)
@@ -19,7 +19,7 @@
 
 Pair Claude's coding intelligence with Blender's 3D engine and treat prompts as a *technical director*. The CLI is the glue: it talks to Claude for code, to Blender for execution, and to your flywheel for everything that comes next.
 
-- **Multi-provider.** Anthropic Claude or DeepSeek — flip with `--provider`, same prompts, same quality signal.
+- **Multi-provider.** Anthropic Claude, DeepSeek, or Google Gemini — flip with `--provider`, same prompts, same quality signal.
 - **Runs in the browser.** Single static HTML in `web/` — no server, no build, no deps. Open the file, paste a key, generate.
 - **Pure Python.** No native extensions. Runs on Apple Silicon, Raspberry Pi, AWS Graviton, x86.
 - **Prompt-cached system block.** ~80% token-cost reduction after the first call in a batch.
@@ -75,7 +75,13 @@ python blender_gen.py "spinning torus"                         # opus-4-7
 # Switch to DeepSeek (OpenAI-compatible, no new dep)
 export DEEPSEEK_API_KEY=sk-...
 python blender_gen.py "spinning torus" --provider deepseek     # deepseek-chat
-python blender_gen.py --list-models                            # catalog
+
+# Switch to Google Gemini (OpenAI-compatible, no new dep)
+export GEMINI_API_KEY=...
+python blender_gen.py "spinning torus" --provider gemini       # gemini-2.5-flash
+
+python blender_gen.py --list-models                            # full catalog
+python blender_gen.py --open                                   # launch the browser UI
 ```
 
 ---

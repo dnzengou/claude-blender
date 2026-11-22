@@ -58,7 +58,7 @@ for _stream in (sys.stdout, sys.stderr):
         except Exception:  # noqa: BLE001 — defensive: never crash on stream config
             pass
 
-__version__ = "0.20.0"
+__version__ = "0.21.0"
 
 MCP_TIMEOUT = 10  # seconds
 
@@ -130,15 +130,22 @@ PRICING: dict[str, tuple] = {
     # DeepSeek (OpenAI-compatible; no cache_read/cache_write, columns repeated).
     "deepseek-chat":              ( 0.27,  1.10, 0.27,  1.10),
     "deepseek-reasoner":          ( 0.55,  2.19, 0.55,  2.19),
+    # Gemini (OpenAI-compatible endpoint; no cache columns).
+    "gemini-2.5-pro":             ( 1.25, 10.00, 1.25, 10.00),
+    "gemini-2.5-flash":           ( 0.30,  2.50, 0.30,  2.50),
 }
 
-# Providers → base URL + default model.
+# Providers → base URL (for OpenAI-compatible), key env, default model, catalog.
 PROVIDERS: dict[str, dict] = {
-    "anthropic": {"default_model": "claude-opus-4-7",
+    "anthropic": {"default_model": "claude-opus-4-7", "key_env": "ANTHROPIC_API_KEY",
                   "models": ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"]},
     "deepseek":  {"default_model": "deepseek-chat", "base_url": "https://api.deepseek.com",
                   "key_env": "DEEPSEEK_API_KEY",
                   "models": ["deepseek-chat", "deepseek-reasoner"]},
+    "gemini":    {"default_model": "gemini-2.5-flash",
+                  "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+                  "key_env": "GEMINI_API_KEY",
+                  "models": ["gemini-2.5-pro", "gemini-2.5-flash"]},
 }
 
 
@@ -273,6 +280,12 @@ def _pick_model(prompt: str, default: str, provider: str = "anthropic") -> str:
             return "deepseek-chat"
         if long_scene:
             return "deepseek-reasoner"
+        return default
+    if provider == "gemini":
+        if short_edit:
+            return "gemini-2.5-flash"
+        if long_scene:
+            return "gemini-2.5-pro"
         return default
     if short_edit:
         return "claude-haiku-4-5-20251001"
@@ -461,15 +474,17 @@ def run_doctor(host: str, port: int) -> int:
         failures += 1
 
     # 2. API keys — at least one provider must be configured.
-    ak = os.environ.get("ANTHROPIC_API_KEY", "")
-    dk = os.environ.get("DEEPSEEK_API_KEY", "")
-    ak_m = (ak[:7] + "..." + ak[-4:]) if len(ak) > 14 else ("(missing)" if not ak else "(short)")
-    dk_m = (dk[:5] + "..." + dk[-4:]) if len(dk) > 10 else ("(missing)" if not dk else "(short)")
-    _check("ANTHROPIC_API_KEY", bool(ak), ak_m,
-           "export ANTHROPIC_API_KEY=sk-ant-... (https://console.anthropic.com/)")
-    _check("DEEPSEEK_API_KEY",  bool(dk), dk_m,
-           "export DEEPSEEK_API_KEY=sk-... (https://platform.deepseek.com/)  (optional)")
-    if not (ak or dk):
+    def _mask(v: str) -> str:
+        return (v[:5] + "..." + v[-4:]) if len(v) > 10 else ("(missing)" if not v else "(short)")
+    found = False
+    for prov, cfg in PROVIDERS.items():
+        env = cfg["key_env"]
+        val = os.environ.get(env, "")
+        if val:
+            found = True
+        _check(env, bool(val), _mask(val),
+               f"export {env}=... to enable --provider {prov}  (optional)")
+    if not found:
         failures += 1
         print("         -> at least one provider key is required to generate.")
 
@@ -563,21 +578,23 @@ class _Usage:
         self.cache_creation_input_tokens = cache_creation_input_tokens
 
 
-def _deepseek_call(prompt: str, model: str, stream: bool) -> tuple[str, _Usage]:
-    """OpenAI-compatible POST to DeepSeek. Pure stdlib, no new dep."""
-    key = os.environ.get("DEEPSEEK_API_KEY", "")
+def _openai_compat_call(provider: str, prompt: str, model: str, stream: bool) -> tuple[str, _Usage]:
+    """OpenAI-compatible POST. Serves DeepSeek and Gemini through the same shape.
+    Pure stdlib, no new dep. Streaming is coalesced to a single final print."""
+    cfg = PROVIDERS[provider]
+    key = os.environ.get(cfg["key_env"], "")
     if not key:
-        print("Error: DEEPSEEK_API_KEY is not set.", file=sys.stderr)
+        print(f"Error: {cfg['key_env']} is not set.", file=sys.stderr)
         sys.exit(1)
     body = json.dumps({
         "model": model,
         "max_tokens": 4096,
-        "stream": False,  # streaming SSE handled below if stream=True
+        "stream": False,
         "messages": [{"role": "system", "content": SYSTEM_PROMPT},
                      {"role": "user", "content": prompt}],
     }).encode()
     req = urllib.request.Request(
-        PROVIDERS["deepseek"]["base_url"] + "/chat/completions",
+        cfg["base_url"] + "/chat/completions",
         data=body,
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
                  "User-Agent": f"claude-blender/{__version__}"},
@@ -626,8 +643,8 @@ def generate_blender_script(prompt: str, model: str, stream: bool = False, verbo
             if c is not None:
                 cost_sink.append(c)
 
-    if provider == "deepseek":
-        text, usage = _call_with_retry(lambda: _deepseek_call(prompt, model, stream), retries)
+    if provider in ("deepseek", "gemini"):
+        text, usage = _call_with_retry(lambda: _openai_compat_call(provider, prompt, model, stream), retries)
         _post(usage)
         return text
 
@@ -1021,6 +1038,8 @@ def main():
     parser.add_argument("--version", action="version", version=f"claude-blender {__version__}")
     parser.add_argument("--doctor", action="store_true",
                         help="Run onboarding diagnostic (API key, Blender MCP, cache perms) and exit")
+    parser.add_argument("--open", dest="open_ui", action="store_true",
+                        help="Open the local browser UI (web/index.html) in the default browser and exit")
 
     # Input modes are mutually exclusive but not always required
     # (--list-presets exits before any input is needed).
@@ -1132,6 +1151,15 @@ def main():
 
     if args.doctor:
         sys.exit(run_doctor(args.host, args.port))
+
+    if args.open_ui:
+        ui = Path(__file__).resolve().parent / "web" / "index.html"
+        if not ui.exists():
+            print(f"Error: UI not found at {ui}", file=sys.stderr)
+            sys.exit(1)
+        _open_preview(str(ui))  # reuses the cross-platform opener
+        print(f"Opened {ui}")
+        return
 
     if args.list_models:
         for prov, cfg in PROVIDERS.items():

@@ -14,7 +14,8 @@ claude-blender is a commercial-grade bridge between Claude and Blender 4.x. It w
 
 ## Code
 
-- [blender_gen.py](./blender_gen.py): the whole CLI — argparse surface, multi-provider (Anthropic + DeepSeek), MCP socket, flywheel, `--doctor`
+- [blender_gen.py](./blender_gen.py): the whole CLI — argparse surface, multi-provider (Anthropic + DeepSeek + Gemini), MCP socket, flywheel, `--doctor`, `--open`
+- [tests/test_core.py](./tests/test_core.py): stdlib-only unittest suite — 17 cases guarding core invariants + docs drift
 - [agent_seo.py](./agent_seo.py): standalone, zero-dep agent-SEO scaffolder (reusable across projects)
 - [web/index.html](./web/index.html): single-file browser UI (zero server, zero build; keys stay in localStorage)
 - [requirements.txt](./requirements.txt): one dependency — `anthropic` (only for provider=anthropic)
